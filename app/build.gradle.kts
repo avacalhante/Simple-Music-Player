@@ -13,6 +13,16 @@ base {
     archivesName.set("music-player")
 }
 
+configurations.all {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "com.github.duolingo" && requested.name == "rtl-viewpager") {
+            // the commit pinned by Simple-Commons cannot be built by JitPack anymore, use the last released tag instead (rewritten to AndroidX by jetifier)
+            useVersion("v1.0.3")
+            because("JitPack builds of the pinned rtl-viewpager commit fail")
+        }
+    }
+}
+
 val keystorePropertiesFile: File = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
