@@ -38,7 +38,8 @@ data class Track(
     @ColumnInfo(name = "year") var year: Int,
     @ColumnInfo(name = "date_added") var dateAdded: Int,
     @ColumnInfo(name = "order_in_playlist") var orderInPlaylist: Int,
-    @ColumnInfo(name = "flags") var flags: Int = 0
+    @ColumnInfo(name = "flags") var flags: Int = 0,
+    @ColumnInfo(name = "first_seen") var firstSeen: Int = 0  // when the app first saw this file's content, 0 if not known yet
 ) : Serializable, ListItem() {
 
     companion object {
@@ -63,7 +64,7 @@ data class Track(
                 }
 
                 sorting and PLAYER_SORT_BY_TRACK_ID != 0 -> first.trackId.compareTo(second.trackId)
-                sorting and PLAYER_SORT_BY_DATE_ADDED != 0 -> first.dateAdded.compareTo(second.dateAdded)
+                sorting and PLAYER_SORT_BY_DATE_ADDED != 0 -> first.getDateAddedProper().compareTo(second.getDateAddedProper())
                 sorting and PLAYER_SORT_BY_CUSTOM != 0 -> first.orderInPlaylist.compareTo(second.orderInPlaylist)
                 else -> first.duration.compareTo(second.duration)
             }
@@ -75,6 +76,8 @@ data class Track(
             return@Comparator result
         }
     }
+
+    fun getDateAddedProper() = firstSeen.takeIf { it > 0 } ?: dateAdded
 
     fun getBubbleText(sorting: Int) = when {
         sorting and PLAYER_SORT_BY_TITLE != 0 -> title

@@ -10,7 +10,7 @@ import com.simplemobiletools.musicplayer.interfaces.*
 import com.simplemobiletools.musicplayer.models.*
 import com.simplemobiletools.musicplayer.objects.MyExecutor
 
-@Database(entities = [Track::class, Playlist::class, QueueItem::class, Artist::class, Album::class, Genre::class], version = 13)
+@Database(entities = [Track::class, Playlist::class, QueueItem::class, Artist::class, Album::class, Genre::class, TrackSeen::class, TrackHashCache::class], version = 14)
 abstract class SongsDatabase : RoomDatabase() {
 
     abstract fun SongsDao(): SongsDao
@@ -24,6 +24,8 @@ abstract class SongsDatabase : RoomDatabase() {
     abstract fun AlbumsDao(): AlbumsDao
 
     abstract fun GenresDao(): GenresDao
+
+    abstract fun TrackSeenDao(): TrackSeenDao
 
     companion object {
         private var db: SongsDatabase? = null
@@ -46,6 +48,7 @@ abstract class SongsDatabase : RoomDatabase() {
                             .addMigrations(MIGRATION_10_11)
                             .addMigrations(MIGRATION_11_12)
                             .addMigrations(MIGRATION_12_13)
+                            .addMigrations(MIGRATION_13_14)
                             .build()
                     }
                 }
@@ -198,6 +201,24 @@ abstract class SongsDatabase : RoomDatabase() {
 
                     execSQL("CREATE TABLE `genres` (`id` INTEGER NOT NULL PRIMARY KEY, `title` TEXT NOT NULL, `track_cnt` INTEGER NOT NULL, `album_art` TEXT NOT NULL)")
                     execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_genres_id` ON `genres` (`id`)")
+                }
+            }
+        }
+
+        // adding the hash based "first seen" timestamp, used instead of MediaStore's date_added for sorting
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.apply {
+                    execSQL("ALTER TABLE tracks ADD COLUMN first_seen INTEGER NOT NULL DEFAULT 0")
+
+                    // keep the currently displayed order until the next scan assigns the real, hash based values
+                    execSQL("UPDATE tracks SET first_seen = date_added")
+
+                    execSQL("CREATE TABLE IF NOT EXISTS `track_seen` (`hash` TEXT NOT NULL, `first_seen` INTEGER NOT NULL, PRIMARY KEY(`hash`))")
+                    execSQL(
+                        "CREATE TABLE IF NOT EXISTS `track_hash_cache` (`path` TEXT NOT NULL, `hash` TEXT NOT NULL, `size` INTEGER NOT NULL, " +
+                            "`last_modified` INTEGER NOT NULL, PRIMARY KEY(`path`))"
+                    )
                 }
             }
         }

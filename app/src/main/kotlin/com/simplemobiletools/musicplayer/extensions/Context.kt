@@ -46,6 +46,8 @@ val Context.albumsDAO: AlbumsDao get() = getTracksDB().AlbumsDao()
 
 val Context.genresDAO: GenresDao get() = getTracksDB().GenresDao()
 
+val Context.trackSeenDAO: TrackSeenDao get() = getTracksDB().TrackSeenDao()
+
 val Context.audioHelper: AudioHelper get() = AudioHelper(this)
 
 val Context.mediaScanner: SimpleMediaScanner get() = SimpleMediaScanner.getInstance(applicationContext as Application)
