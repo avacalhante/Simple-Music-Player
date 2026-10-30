@@ -16,9 +16,13 @@ import com.simplemobiletools.commons.helpers.isRPlus
 import com.simplemobiletools.musicplayer.R
 import com.simplemobiletools.musicplayer.extensions.audioHelper
 import com.simplemobiletools.musicplayer.extensions.config
+import com.simplemobiletools.musicplayer.extensions.trackSeenDAO
+import com.simplemobiletools.musicplayer.extensions.tracksDAO
 import com.simplemobiletools.musicplayer.models.*
 import java.io.File
 import java.io.FileInputStream
+import java.io.RandomAccessFile
+import java.security.MessageDigest
 
 /**
  * This singleton class manages the process of querying [MediaStore] for new audio files, manually scanning storage for missing audio files, and removing outdated
@@ -175,6 +179,7 @@ class SimpleMediaScanner(private val context: Application) {
     }
 
     private fun updateAllDatabases() {
+        applyFirstSeenTimestamps()
         context.audioHelper.apply {
             insertTracks(newTracks)
             insertAlbums(newAlbums)
@@ -182,6 +187,72 @@ class SimpleMediaScanner(private val context: Application) {
             insertGenres(newGenres)
         }
         updateAllTracksPlaylist()
+    }
+
+    /**
+     * Assigns every new track the timestamp its content was first seen by the app. The value is looked up by a hash of the file, so moving or copying
+     * files around does not change it, unlike [MediaStore.Audio.Media.DATE_ADDED] which is derived from the file's modification time. Hashes of files that
+     * have not changed are cached, so only actually new or modified files have to be read.
+     */
+    private fun applyFirstSeenTimestamps() {
+        if (newTracks.isEmpty()) {
+            return
+        }
+
+        val dao = context.trackSeenDAO
+        val seenByHash = dao.getAllSeen().associateBy { it.hash }
+        val cacheByPath = dao.getAllHashCache().associateBy { it.path }
+
+        // fall back to the values stored by the previous scan, so upgrading the app does not shuffle the currently displayed order
+        val previouslyKnown = context.tracksDAO.getAll()
+            .associate { it.path to it.getDateAddedProper() }
+        val now = (System.currentTimeMillis() / 1000L).toInt()
+
+        val newSeenEntries = arrayListOf<TrackSeen>()
+        val newCacheEntries = arrayListOf<TrackHashCache>()
+        for (track in newTracks) {
+            val file = File(track.path)
+            val size = file.length()
+            val lastModified = file.lastModified()
+            val cached = cacheByPath[track.path]
+            val hash = if (cached != null && cached.size == size && cached.lastModified == lastModified) {
+                cached.hash
+            } else {
+                file.getContentHash(size) ?: continue
+            }
+
+            val firstSeen = seenByHash[hash]?.firstSeen
+                ?: previouslyKnown[track.path]?.takeIf { it > 0 }
+                ?: track.dateAdded.takeIf { it > 0 }
+                ?: now
+
+            if (seenByHash[hash] == null) {
+                newSeenEntries.add(TrackSeen(hash, firstSeen))
+            }
+
+            if (cached == null || cached.hash != hash || cached.size != size || cached.lastModified != lastModified) {
+                newCacheEntries.add(TrackHashCache(track.path, hash, size, lastModified))
+            }
+
+            track.firstSeen = firstSeen
+        }
+
+        if (newSeenEntries.isNotEmpty()) {
+            dao.insertSeen(newSeenEntries)
+        }
+
+        if (newCacheEntries.isNotEmpty()) {
+            dao.insertHashCache(newCacheEntries)
+        }
+
+        // albums sort by the date of their oldest track
+        val firstSeenByAlbum = newTracks.filter { it.firstSeen > 0 }.groupBy { it.albumId }
+        for (album in newAlbums) {
+            val earliestFirstSeen = firstSeenByAlbum[album.id]?.minOf { it.firstSeen }
+            if (earliestFirstSeen != null) {
+                album.dateAdded = earliestFirstSeen
+            }
+        }
     }
 
     private fun updateAllTracksPlaylist() {
@@ -597,6 +668,12 @@ class SimpleMediaScanner(private val context: Application) {
         val invalidGenres = context.audioHelper.getAllGenres().filter { it.id !in newGenreIds }.toMutableList()
         invalidGenres += newGenres.filter { genre -> newTracks.none { it.genreId == genre.id } }
         context.audioHelper.deleteGenres(invalidGenres)
+
+        // forget cached hashes of removed files, the track_seen entries themselves are kept so moved files stay recognized
+        val trackPaths = newTracks.map { it.path }.toHashSet()
+        context.trackSeenDAO.getAllHashCachePaths()
+            .filter { it !in trackPaths }
+            .forEach { context.trackSeenDAO.deleteHashCache(it) }
     }
 
     private fun maybeShowScanProgress(pathBeingScanned: String = "", progress: Int = 0, max: Int = 0) {
@@ -651,5 +728,38 @@ class SimpleMediaScanner(private val context: Application) {
                 instance!!
             }
         }
+    }
+}
+
+private const val HASH_CHUNK_SIZE = 256 * 1024L
+
+/**
+ * Returns a hash identifying the content of this file. Only the file size and its first and last [HASH_CHUNK_SIZE] bytes are hashed, so even a large
+ * library can be processed quickly, while two different audio files sharing all of those is practically impossible.
+ */
+private fun File.getContentHash(size: Long): String? {
+    if (size <= 0 || !exists()) {
+        return null
+    }
+
+    return try {
+        val digest = MessageDigest.getInstance("SHA-256")
+        digest.update(size.toString().toByteArray())
+        RandomAccessFile(this, "r").use { file ->
+            val head = ByteArray(minOf(size, HASH_CHUNK_SIZE).toInt())
+            file.readFully(head)
+            digest.update(head)
+
+            if (size > HASH_CHUNK_SIZE) {
+                val tailSize = minOf(size - HASH_CHUNK_SIZE, HASH_CHUNK_SIZE).toInt()
+                val tail = ByteArray(tailSize)
+                file.seek(size - tailSize)
+                file.readFully(tail)
+                digest.update(tail)
+            }
+        }
+        digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    } catch (ignored: Exception) {
+        null
     }
 }
