@@ -13,6 +13,7 @@ import com.simplemobiletools.musicplayer.helpers.EXTRA_ARTIST_ID
 import com.simplemobiletools.musicplayer.helpers.EXTRA_COVER_ART
 import com.simplemobiletools.musicplayer.helpers.EXTRA_DATE_ADDED
 import com.simplemobiletools.musicplayer.helpers.EXTRA_DURATION
+import com.simplemobiletools.musicplayer.helpers.EXTRA_FIRST_SEEN
 import com.simplemobiletools.musicplayer.helpers.EXTRA_FLAGS
 import com.simplemobiletools.musicplayer.helpers.EXTRA_FOLDER_NAME
 import com.simplemobiletools.musicplayer.helpers.EXTRA_GENRE
@@ -161,6 +162,7 @@ private fun createBundleFromTrack(track: Track) = bundleOf(
     EXTRA_GENRE_ID to track.genreId,
     EXTRA_YEAR to track.year,
     EXTRA_DATE_ADDED to track.dateAdded,
+    EXTRA_FIRST_SEEN to track.firstSeen,
     EXTRA_ORDER_IN_PLAYLIST to track.orderInPlaylist,
     EXTRA_FLAGS to track.flags
 )
@@ -185,6 +187,7 @@ private fun createTrackFromBundle(bundle: Bundle): Track {
         year = bundle.getInt(EXTRA_YEAR),
         dateAdded = bundle.getInt(EXTRA_DATE_ADDED),
         orderInPlaylist = bundle.getInt(EXTRA_ORDER_IN_PLAYLIST),
-        flags = bundle.getInt(EXTRA_FLAGS)
+        flags = bundle.getInt(EXTRA_FLAGS),
+        firstSeen = bundle.getInt(EXTRA_FIRST_SEEN)
     )
 }
