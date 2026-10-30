@@ -200,7 +200,8 @@ class SimpleMediaScanner(private val context: Application) {
         }
 
         val dao = context.trackSeenDAO
-        val seenByHash = dao.getAllSeen().associateBy { it.hash }
+        // mutable, so duplicated content within this scan resolves to the same timestamp
+        val seenByHash = dao.getAllSeen().associateByTo(hashMapOf()) { it.hash }
         val cacheByPath = dao.getAllHashCache().associateBy { it.path }
 
         // fall back to the values stored by the previous scan, so upgrading the app does not shuffle the currently displayed order
@@ -218,23 +219,30 @@ class SimpleMediaScanner(private val context: Application) {
             val hash = if (cached != null && cached.size == size && cached.lastModified == lastModified) {
                 cached.hash
             } else {
-                file.getContentHash(size) ?: continue
+                file.getContentHash(size)
             }
 
-            val firstSeen = seenByHash[hash]?.firstSeen
+            val firstSeen = hash?.let { seenByHash[it]?.firstSeen }
                 ?: previouslyKnown[track.path]?.takeIf { it > 0 }
                 ?: track.dateAdded.takeIf { it > 0 }
                 ?: now
 
+            track.firstSeen = firstSeen
+
+            // unreadable files keep their last known timestamp, they just cannot be cached yet
+            if (hash == null) {
+                continue
+            }
+
             if (seenByHash[hash] == null) {
-                newSeenEntries.add(TrackSeen(hash, firstSeen))
+                val entry = TrackSeen(hash, firstSeen)
+                seenByHash[hash] = entry
+                newSeenEntries.add(entry)
             }
 
             if (cached == null || cached.hash != hash || cached.size != size || cached.lastModified != lastModified) {
                 newCacheEntries.add(TrackHashCache(track.path, hash, size, lastModified))
             }
-
-            track.firstSeen = firstSeen
         }
 
         if (newSeenEntries.isNotEmpty()) {
