@@ -10,7 +10,7 @@ import com.simplemobiletools.musicplayer.interfaces.*
 import com.simplemobiletools.musicplayer.models.*
 import com.simplemobiletools.musicplayer.objects.MyExecutor
 
-@Database(entities = [Track::class, Playlist::class, QueueItem::class, Artist::class, Album::class, Genre::class, TrackSeen::class, TrackHashCache::class], version = 14)
+@Database(entities = [Track::class, Playlist::class, QueueItem::class, Artist::class, Album::class, Genre::class, TrackSeen::class, TrackHashCache::class], version = 15)
 abstract class SongsDatabase : RoomDatabase() {
 
     abstract fun SongsDao(): SongsDao
@@ -49,6 +49,7 @@ abstract class SongsDatabase : RoomDatabase() {
                             .addMigrations(MIGRATION_11_12)
                             .addMigrations(MIGRATION_12_13)
                             .addMigrations(MIGRATION_13_14)
+                            .addMigrations(MIGRATION_14_15)
                             .build()
                     }
                 }
@@ -219,6 +220,19 @@ abstract class SongsDatabase : RoomDatabase() {
                         "CREATE TABLE IF NOT EXISTS `track_hash_cache` (`path` TEXT NOT NULL, `hash` TEXT NOT NULL, `size` INTEGER NOT NULL, " +
                             "`last_modified` INTEGER NOT NULL, PRIMARY KEY(`path`))"
                     )
+                }
+            }
+        }
+
+        // indices for the columns used to look up tracks and albums, the tables are large and were scanned in full on every query
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.apply {
+                    execSQL("CREATE INDEX IF NOT EXISTS `index_tracks_album_id` ON `tracks` (`album_id`)")
+                    execSQL("CREATE INDEX IF NOT EXISTS `index_tracks_artist_id` ON `tracks` (`artist_id`)")
+                    execSQL("CREATE INDEX IF NOT EXISTS `index_tracks_genre_id` ON `tracks` (`genre_id`)")
+                    execSQL("CREATE INDEX IF NOT EXISTS `index_tracks_playlist_id` ON `tracks` (`playlist_id`)")
+                    execSQL("CREATE INDEX IF NOT EXISTS `index_albums_artist_id` ON `albums` (`artist_id`)")
                 }
             }
         }

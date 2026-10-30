@@ -12,7 +12,13 @@ import com.simplemobiletools.musicplayer.helpers.PLAYER_SORT_BY_ARTIST_TITLE
 import com.simplemobiletools.musicplayer.helpers.PLAYER_SORT_BY_DATE_ADDED
 import com.simplemobiletools.musicplayer.helpers.PLAYER_SORT_BY_TITLE
 
-@Entity(tableName = "albums", indices = [(Index(value = ["id"], unique = true))])
+@Entity(
+    tableName = "albums",
+    indices = [
+        Index(value = ["id"], unique = true),
+        Index(value = ["artist_id"])
+    ]
+)
 data class Album(
     @PrimaryKey(autoGenerate = true) var id: Long,
     @ColumnInfo(name = "artist") val artist: String,

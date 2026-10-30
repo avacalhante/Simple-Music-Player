@@ -18,7 +18,16 @@ import com.simplemobiletools.musicplayer.helpers.*
 import java.io.File
 import java.io.Serializable
 
-@Entity(tableName = "tracks", indices = [Index(value = ["media_store_id", "playlist_id"], unique = true)])
+@Entity(
+    tableName = "tracks",
+    indices = [
+        Index(value = ["media_store_id", "playlist_id"], unique = true),
+        Index(value = ["album_id"]),
+        Index(value = ["artist_id"]),
+        Index(value = ["genre_id"]),
+        Index(value = ["playlist_id"])
+    ]
+)
 data class Track(
     @PrimaryKey(autoGenerate = true) var id: Long,
     @ColumnInfo(name = "media_store_id") var mediaStoreId: Long,
