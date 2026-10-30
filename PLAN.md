@@ -28,12 +28,14 @@ Measured from the code, not guessed:
 
 Schema bump to 15. This is the change most likely to be felt on a large library.
 
-- [ ] Add Room indices:
+Status: implemented in `be93b2ac` on `feat/db-indices`; on-device upgrade verification still pending.
+
+- [x] Add Room indices:
   - `Track`: `album_id`, `artist_id`, `genre_id`, `playlist_id`
   - `Album`: `artist_id`
   - Leave the existing unique `(media_store_id, playlist_id)` index in place.
-- [ ] `SongsDatabase`: version 15, add `MIGRATION_14_15` with matching `CREATE INDEX IF NOT EXISTS` statements.
-- [ ] Commit the generated `app/schemas/.../15.json`.
+- [x] `SongsDatabase`: version 15, add `MIGRATION_14_15` with matching `CREATE INDEX IF NOT EXISTS` statements.
+- [x] Commit the generated `app/schemas/.../15.json`.
 - [ ] Verify upgrade from an existing 14 database (no Room schema-mismatch crash) and a fresh install.
 
 Notes:
