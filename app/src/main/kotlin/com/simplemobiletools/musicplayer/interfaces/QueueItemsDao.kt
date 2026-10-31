@@ -26,6 +26,17 @@ interface QueueItemsDao {
     @Query("UPDATE queue_items SET is_current = 1, last_position = :lastPosition WHERE track_id = :trackId")
     fun saveCurrentTrackProgress(trackId: Long, lastPosition: Int)
 
+    /**
+     * Marks [trackId] as the current track and stores its position in one statement,
+     * without touching the rest of the queue.
+     */
+    @Query(
+        "UPDATE queue_items SET " +
+            "is_current = CASE WHEN track_id = :trackId THEN 1 ELSE 0 END, " +
+            "last_position = CASE WHEN track_id = :trackId THEN :lastPosition ELSE last_position END"
+    )
+    fun updateCurrentTrack(trackId: Long, lastPosition: Int)
+
     @Query("UPDATE queue_items SET track_order = :order WHERE track_id = :trackId")
     fun setOrder(trackId: Long, order: Int)
 

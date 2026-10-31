@@ -89,13 +89,27 @@ internal fun PlaybackService.updatePlaybackState() {
     withPlayer {
         updatePlaybackInfo(player)
         broadcastUpdateWidgetState()
-        val currentMediaItem = currentMediaItem
-        if (currentMediaItem != null) {
-            mediaItemProvider.saveRecentItemsWithStartPosition(
-                mediaItems = currentMediaItems,
-                current = currentMediaItem,
-                startPosition = currentPosition
-            )
-        }
+        val currentMediaItem = currentMediaItem ?: return@withPlayer
+        mediaItemProvider.saveRecentItemsWithStartPosition(
+            mediaItems = currentMediaItems,
+            current = currentMediaItem,
+            startPosition = currentPosition
+        )
+    }
+}
+
+/**
+ * Stores just the current track and its position. Used for playback events that leave the queue untouched,
+ * so a button press does not rewrite every queue row.
+ */
+internal fun PlaybackService.saveCurrentTrackProgress() {
+    withPlayer {
+        updatePlaybackInfo(player)
+        broadcastUpdateWidgetState()
+        val currentMediaItem = currentMediaItem ?: return@withPlayer
+        mediaItemProvider.saveCurrentTrackProgress(
+            trackId = currentMediaItem.mediaId.toLong(),
+            startPosition = currentPosition
+        )
     }
 }

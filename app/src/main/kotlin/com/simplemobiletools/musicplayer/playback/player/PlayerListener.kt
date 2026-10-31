@@ -17,18 +17,21 @@ internal fun PlaybackService.getPlayerListener() = object : Player.Listener {
     override fun onPlayerError(error: PlaybackException) = toast(com.simplemobiletools.commons.R.string.unknown_error_occurred, Toast.LENGTH_LONG)
 
     override fun onEvents(player: Player, events: Player.Events) {
-        if (
+        if (events.contains(Player.EVENT_TIMELINE_CHANGED)) {
+            // items were added, removed or moved, so the complete queue has to be persisted.
+            // note: EVENT_TRACKS_CHANGED is unrelated here, it fires when the current item's audio tracks change.
+            updatePlaybackState()
+        } else if (
             events.containsAny(
                 Player.EVENT_POSITION_DISCONTINUITY,
                 Player.EVENT_MEDIA_ITEM_TRANSITION,
-                Player.EVENT_TRACKS_CHANGED,
-                Player.EVENT_TIMELINE_CHANGED,
                 Player.EVENT_PLAYBACK_STATE_CHANGED,
                 Player.EVENT_IS_PLAYING_CHANGED,
                 Player.EVENT_PLAYLIST_METADATA_CHANGED
             )
         ) {
-            updatePlaybackState()
+            // only the current track and its position changed, keep the rest of the queue as it is
+            saveCurrentTrackProgress()
         }
     }
 

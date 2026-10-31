@@ -24,6 +24,7 @@ import com.simplemobiletools.musicplayer.helpers.TAB_TRACKS
 import com.simplemobiletools.musicplayer.models.QueueItem
 import com.simplemobiletools.musicplayer.models.toMediaItems
 import java.util.concurrent.Executors
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val STATE_CREATED = 1
 private const val STATE_INITIALIZING = 2
@@ -56,6 +57,9 @@ internal class MediaItemProvider(private val context: Context) {
     private val treeNodes = mutableMapOf<String, MediaItemNode>()
     private var titleMap: MutableMap<String, MediaItemNode> = mutableMapOf()
     private val onReadyListeners = mutableListOf<(Boolean) -> Unit>()
+
+    // ids of the queue as it was last written to the database, used to skip needless rewrites
+    private var savedQueueIds: List<Long>? = null
 
     private var state: Int = STATE_CREATED
         set(value) {
@@ -159,12 +163,35 @@ internal class MediaItemProvider(private val context: Context) {
         }
 
         executor.execute {
-            val trackId = current.mediaId.toLong()
-            val queueItems = mediaItems.mapIndexed { index, mediaItem ->
-                QueueItem(trackId = mediaItem.mediaId.toLong(), trackOrder = index, isCurrent = false, lastPosition = 0)
+            val trackIds = mediaItems.map { it.mediaId.toLong() }
+            val currentTrackId = current.mediaId.toLong()
+            val positionSeconds = startPosition.coerceAtLeast(0L).milliseconds.inWholeSeconds.toInt()
+            val previousIds = savedQueueIds ?: context.queueDAO.getAll().map { it.trackId }
+            savedQueueIds = previousIds
+
+            if (trackIds == previousIds) {
+                // the player also reports timeline changes for internal reasons such as the shuffle order,
+                // so only touch the current row when the queue itself did not change
+                context.queueDAO.updateCurrentTrack(currentTrackId, positionSeconds)
+                return@execute
             }
 
-            audioHelper.resetQueue(queueItems, trackId, startPosition)
+            val queueItems = trackIds.mapIndexed { index, trackId ->
+                QueueItem(trackId = trackId, trackOrder = index, isCurrent = false, lastPosition = 0)
+            }
+
+            audioHelper.resetQueue(queueItems, currentTrackId, startPosition)
+            savedQueueIds = trackIds
+        }
+    }
+
+    /**
+     * Persists only the current track and its position, for playback events that do not change the queue.
+     */
+    fun saveCurrentTrackProgress(trackId: Long, startPosition: Long) {
+        executor.execute {
+            val positionSeconds = startPosition.coerceAtLeast(0L).milliseconds.inWholeSeconds.toInt()
+            context.queueDAO.updateCurrentTrack(trackId, positionSeconds)
         }
     }
 
