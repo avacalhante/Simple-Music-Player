@@ -24,6 +24,6 @@ interface TrackSeenDao {
     @Query("SELECT path FROM track_hash_cache")
     fun getAllHashCachePaths(): List<String>
 
-    @Query("DELETE FROM track_hash_cache WHERE path = :path")
-    fun deleteHashCache(path: String)
+    @Query("DELETE FROM track_hash_cache WHERE path IN (:paths)")
+    fun deleteHashCachePaths(paths: List<String>)
 }

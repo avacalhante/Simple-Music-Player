@@ -53,6 +53,7 @@ data class Track(
 
     companion object {
         private const val serialVersionUID = 6717978793256852245L
+        private val alphanumericComparator = AlphanumericComparator()
 
         fun getComparator(sorting: Int) = Comparator<Track> { first, second ->
             var result = when {
@@ -60,7 +61,7 @@ data class Track(
                     when {
                         first.title == MediaStore.UNKNOWN_STRING && second.title != MediaStore.UNKNOWN_STRING -> 1
                         first.title != MediaStore.UNKNOWN_STRING && second.title == MediaStore.UNKNOWN_STRING -> -1
-                        else -> AlphanumericComparator().compare(first.title.lowercase(), second.title.lowercase())
+                        else -> alphanumericComparator.compare(first.title.lowercase(), second.title.lowercase())
                     }
                 }
 
@@ -68,7 +69,7 @@ data class Track(
                     when {
                         first.artist == MediaStore.UNKNOWN_STRING && second.artist != MediaStore.UNKNOWN_STRING -> 1
                         first.artist != MediaStore.UNKNOWN_STRING && second.artist == MediaStore.UNKNOWN_STRING -> -1
-                        else -> AlphanumericComparator().compare(first.artist.lowercase(), second.artist.lowercase())
+                        else -> alphanumericComparator.compare(first.artist.lowercase(), second.artist.lowercase())
                     }
                 }
 

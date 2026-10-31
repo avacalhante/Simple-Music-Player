@@ -30,13 +30,15 @@ data class Album(
     @ColumnInfo(name = "date_added") var dateAdded: Int,
 ) : ListItem() {
     companion object {
+        private val alphanumericComparator = AlphanumericComparator()
+
         fun getComparator(sorting: Int) = Comparator<Album> { first, second ->
             var result = when {
                 sorting and PLAYER_SORT_BY_TITLE != 0 -> {
                     when {
                         first.title == MediaStore.UNKNOWN_STRING && second.title != MediaStore.UNKNOWN_STRING -> 1
                         first.title != MediaStore.UNKNOWN_STRING && second.title == MediaStore.UNKNOWN_STRING -> -1
-                        else -> AlphanumericComparator().compare(first.title.lowercase(), second.title.lowercase())
+                        else -> alphanumericComparator.compare(first.title.lowercase(), second.title.lowercase())
                     }
                 }
 
@@ -44,7 +46,7 @@ data class Album(
                     when {
                         first.artist == MediaStore.UNKNOWN_STRING && second.artist != MediaStore.UNKNOWN_STRING -> 1
                         first.artist != MediaStore.UNKNOWN_STRING && second.artist == MediaStore.UNKNOWN_STRING -> -1
-                        else -> AlphanumericComparator().compare(first.artist.lowercase(), second.artist.lowercase())
+                        else -> alphanumericComparator.compare(first.artist.lowercase(), second.artist.lowercase())
                     }
                 }
 

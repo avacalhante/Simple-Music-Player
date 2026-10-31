@@ -20,13 +20,15 @@ data class Artist(
     @ColumnInfo(name = "album_art") var albumArt: String
 ) {
     companion object {
+        private val alphanumericComparator = AlphanumericComparator()
+
         fun getComparator(sorting: Int) = Comparator<Artist> { first, second ->
             var result = when {
                 sorting and PLAYER_SORT_BY_TITLE != 0 -> {
                     when {
                         first.title == MediaStore.UNKNOWN_STRING && second.title != MediaStore.UNKNOWN_STRING -> 1
                         first.title != MediaStore.UNKNOWN_STRING && second.title == MediaStore.UNKNOWN_STRING -> -1
-                        else -> AlphanumericComparator().compare(first.title.lowercase(), second.title.lowercase())
+                        else -> alphanumericComparator.compare(first.title.lowercase(), second.title.lowercase())
                     }
                 }
 

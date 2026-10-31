@@ -17,9 +17,11 @@ data class Genre(
     @ColumnInfo(name = "album_art") var albumArt: String
 ) {
     companion object {
+        private val alphanumericComparator = AlphanumericComparator()
+
         fun getComparator(sorting: Int) = Comparator<Genre> { first, second ->
             var result = when {
-                sorting and PLAYER_SORT_BY_TITLE != 0 -> AlphanumericComparator().compare(first.title.lowercase(), second.title.lowercase())
+                sorting and PLAYER_SORT_BY_TITLE != 0 -> alphanumericComparator.compare(first.title.lowercase(), second.title.lowercase())
                 else -> first.trackCnt.compareTo(second.trackCnt)
             }
 

@@ -109,7 +109,6 @@ android {
 dependencies {
     implementation(libs.simple.mobile.tools.commons)
     implementation(libs.eventbus)
-    implementation(libs.androidx.media)
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.lifecycle.process)

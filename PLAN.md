@@ -82,12 +82,14 @@ Acceptance: media browser still works; startup after a scan no longer performs h
 
 ## Phase 4 — Cheap list/scan cleanups
 
-- [ ] Hoist `AlphanumericComparator()` to a shared value in each model comparator (verify it is stateless/thread-safe).
-- [ ] Replace the per-path hash-cache deletion loop in `SimpleMediaScanner.cleanupDatabase()` with a bulk delete (chunk the `NOT IN` list to stay under SQLite's variable limit).
-- [ ] Remove the unused `androidx.media:media` dependency.
-- [ ] Optional: avoid re-inserting unchanged tracks on every scan. This is a bigger scanner change; only do it if the above phases don't give enough improvement.
+Status: done on `feat/cheap-cleanups`, verified on the Android 13 device.
 
-Acceptance: no behaviour change; sort results identical.
+- [x] Hoist `AlphanumericComparator()` to a shared `private val` in each model comparator. The class is stateless (it only walks its arguments), so a single instance is safe across threads.
+- [x] Replace the per-path hash-cache deletion loop in `SimpleMediaScanner.cleanupDatabase()` with bulk deletes. The stale paths are computed first and deleted in chunks of 900 with `DELETE ... WHERE path IN (...)`. A chunked `NOT IN` would be wrong: the second chunk would delete rows that were valid in the first one.
+- [x] Remove the unused `androidx.media:media` dependency and its version entry.
+- [ ] Optional: avoid re-inserting unchanged tracks on every scan. This is a bigger scanner change; only do it if the above phases don't give enough improvement. Left for later.
+
+Acceptance: no behaviour change; sort results identical. Verified by comparing the tracks list order before and after, and by seeding a fake path into `track_hash_cache`: the next scan removed it while keeping all 988 real entries.
 
 ## Phase 5 — Dependency/toolchain refresh (separate branch, no UI changes)
 

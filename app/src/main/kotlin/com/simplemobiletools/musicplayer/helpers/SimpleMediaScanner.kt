@@ -24,6 +24,9 @@ import java.io.FileInputStream
 import java.io.RandomAccessFile
 import java.security.MessageDigest
 
+// SQLite allows at most 999 variables per statement
+private const val HASH_CACHE_DELETE_CHUNK = 900
+
 /**
  * This singleton class manages the process of querying [MediaStore] for new audio files, manually scanning storage for missing audio files, and removing outdated
  * files from the local cache. It ensures that only one scan is running at a time to avoid unnecessary expenses and conflicts.
@@ -681,7 +684,8 @@ class SimpleMediaScanner(private val context: Application) {
         val trackPaths = newTracks.map { it.path }.toHashSet()
         context.trackSeenDAO.getAllHashCachePaths()
             .filter { it !in trackPaths }
-            .forEach { context.trackSeenDAO.deleteHashCache(it) }
+            .chunked(HASH_CACHE_DELETE_CHUNK)
+            .forEach { context.trackSeenDAO.deleteHashCachePaths(it) }
     }
 
     private fun maybeShowScanProgress(pathBeingScanned: String = "", progress: Int = 0, max: Int = 0) {

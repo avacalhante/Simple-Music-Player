@@ -7,9 +7,11 @@ import com.simplemobiletools.musicplayer.helpers.PLAYER_SORT_BY_TITLE
 
 data class Folder(val title: String, val trackCount: Int, val path: String) {
     companion object {
+        private val alphanumericComparator = AlphanumericComparator()
+
         fun getComparator(sorting: Int) = Comparator<Folder> { first, second ->
             var result = when {
-                sorting and PLAYER_SORT_BY_TITLE != 0 -> AlphanumericComparator().compare(first.title.lowercase(), second.title.lowercase())
+                sorting and PLAYER_SORT_BY_TITLE != 0 -> alphanumericComparator.compare(first.title.lowercase(), second.title.lowercase())
                 else -> first.trackCount.compareTo(second.trackCount)
             }
 
