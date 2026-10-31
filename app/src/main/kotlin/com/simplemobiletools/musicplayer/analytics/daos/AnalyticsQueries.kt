@@ -24,14 +24,21 @@ data class DailyStats(
     @ColumnInfo(name = "played_seconds") val playedSeconds: Long
 )
 
-data class HourlyStats(
-    @ColumnInfo(name = "hour") val hour: Int,
-    @ColumnInfo(name = "play_count") val playCount: Int
-)
-
 data class DayOfWeekStats(
     @ColumnInfo(name = "day_of_week") val dayOfWeek: Int,
     @ColumnInfo(name = "play_count") val playCount: Int
+)
+
+/**
+ * Average listening window of the closed sessions that started on one weekday.
+ * [startMinutes] is the mean local minute-of-day of the session starts (0..1439),
+ * [lengthSeconds] the mean session length.
+ */
+data class WeekdaySessionWindow(
+    @ColumnInfo(name = "day_of_week") val dayOfWeek: Int,
+    @ColumnInfo(name = "start_minutes") val startMinutes: Double,
+    @ColumnInfo(name = "length_seconds") val lengthSeconds: Double,
+    @ColumnInfo(name = "session_count") val sessionCount: Int
 )
 
 data class FirstTrackPerDay(

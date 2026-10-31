@@ -97,9 +97,9 @@
     <string name="most_played_artists">Most played artists</string>
     <string name="most_played_albums">Most played albums</string>
     <string name="most_played_genres">Most played genres</string>
-    <string name="listening_by_hour">Listening by hour</string>
-    <string name="listening_by_day_of_week">Listening by day of week</string>
-    <string name="hour_range">%1$02d:00 – %2$02d:00</string>
+    <string name="listening_by_day_of_week">Plays by day of week</string>
+    <string name="average_listening_hours">Average listening hours by weekday</string>
+    <string name="time_range">%1$s – %2$s</string>
     <string name="not_played_recently">Not played recently</string>
     <string name="everything_played_recently">Every track you have played was played recently.</string>
     <string name="listening_time_by_day">Listening time by day</string>

@@ -196,20 +196,20 @@
             </LinearLayout>
 
             <LinearLayout
-                android:id="@+id/stats_hours_section"
+                android:id="@+id/stats_weekday_hours_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/stats_hours_label"
+                    android:id="@+id/stats_weekday_hours_label"
                     style="@style/SettingsSectionLabelStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/listening_by_hour" />
+                    android:text="@string/average_listening_hours" />
 
                 <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/stats_hours_list"
+                    android:id="@+id/stats_weekday_hours_list"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:nestedScrollingEnabled="false" />

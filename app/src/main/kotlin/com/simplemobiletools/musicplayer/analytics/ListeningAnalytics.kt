@@ -5,7 +5,6 @@ import com.simplemobiletools.musicplayer.analytics.daos.DailyStats
 import com.simplemobiletools.musicplayer.analytics.daos.DayOfWeekStats
 import com.simplemobiletools.musicplayer.analytics.daos.EngagementCounts
 import com.simplemobiletools.musicplayer.analytics.daos.FirstTrackPerDay
-import com.simplemobiletools.musicplayer.analytics.daos.HourlyStats
 import com.simplemobiletools.musicplayer.analytics.daos.LastPlayedPerTrack
 import com.simplemobiletools.musicplayer.analytics.daos.ListeningSessionDao
 import com.simplemobiletools.musicplayer.analytics.daos.MostPlayedTrack
@@ -15,6 +14,7 @@ import com.simplemobiletools.musicplayer.analytics.daos.TrackPartialStopStats
 import com.simplemobiletools.musicplayer.analytics.daos.PlaylistPlayStats
 import com.simplemobiletools.musicplayer.analytics.daos.PlaylistListeningTime
 import com.simplemobiletools.musicplayer.analytics.daos.TrackListeningTime
+import com.simplemobiletools.musicplayer.analytics.daos.WeekdaySessionWindow
 import com.simplemobiletools.musicplayer.analytics.entities.ListeningSession
 import com.simplemobiletools.musicplayer.analytics.entities.PlayEnd
 import com.simplemobiletools.musicplayer.analytics.entities.PlayStart
@@ -101,6 +101,9 @@ class ListeningAnalyticsStore(private val context: Context) {
         it.copy(lengthSeconds = it.lengthSeconds.coerceAtLeast(0))
     }
 
+    /** Average listening window per weekday, from the closed sessions. */
+    fun getWeekdaySessionWindows(): List<WeekdaySessionWindow> = sessionDao.getWeekdaySessionWindows()
+
     // ---- basic totals ----
 
     fun totalPlayCount(): Int = playStartDao.getTotalPlayCount()
@@ -154,8 +157,6 @@ class ListeningAnalyticsStore(private val context: Context) {
     // ---- time by period ----
 
     fun getDailyStats(limit: Int = 14): List<DailyStats> = playStartDao.getDailyStats(limit)
-
-    fun getHourlyStats(): List<HourlyStats> = playStartDao.getHourlyStats()
 
     fun getDayOfWeekStats(): List<DayOfWeekStats> = playStartDao.getDayOfWeekStats()
 

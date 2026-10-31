@@ -43,4 +43,39 @@ interface ListeningSessionDao {
         ORDER BY s.started_at DESC
     """)
     fun getSessionInfo(): List<SessionInfo>
+
+    /**
+     * Average listening window per weekday, over closed sessions only.
+     * Per session this reuses the same length as [getSessionInfo] (last activity clamped to the close marker),
+     * then averages the local minute-of-day of the start and that length. Sunday = 0, as in `%w`.
+     */
+    @Query("""
+        SELECT day_of_week,
+               AVG(start_minutes) AS start_minutes,
+               AVG(length_seconds) AS length_seconds,
+               COUNT(*) AS session_count
+        FROM (
+            SELECT CAST(strftime('%w', s.started_at, 'unixepoch', 'localtime') AS INTEGER) AS day_of_week,
+                   CAST(strftime('%H', s.started_at, 'unixepoch', 'localtime') AS INTEGER) * 60 +
+                   CAST(strftime('%M', s.started_at, 'unixepoch', 'localtime') AS INTEGER) AS start_minutes,
+                   MAX(
+                       0,
+                       MIN(
+                           COALESCE(
+                               MAX(COALESCE(e.ended_at, p.started_at + CASE WHEN p.duration_seconds > 0 THEN p.duration_seconds ELSE 0 END)),
+                               s.started_at
+                           ),
+                           s.ended_at
+                       ) - s.started_at
+                   ) AS length_seconds
+            FROM listening_sessions AS s
+            LEFT JOIN play_start AS p ON p.session_id = s.id
+            LEFT JOIN play_end AS e ON e.play_start_id = p.id
+            WHERE s.ended_at > 0
+            GROUP BY s.id
+        )
+        GROUP BY day_of_week
+        ORDER BY day_of_week
+    """)
+    fun getWeekdaySessionWindows(): List<WeekdaySessionWindow>
 }

@@ -87,16 +87,6 @@ interface PlayStartDao {
 
     @Query("""
         SELECT
-            CAST(strftime('%H', started_at, 'unixepoch', 'localtime') AS INTEGER) AS hour,
-            COUNT(*) AS play_count
-        FROM play_start
-        GROUP BY hour
-        ORDER BY play_count DESC
-    """)
-    fun getHourlyStats(): List<HourlyStats>
-
-    @Query("""
-        SELECT
             CAST(strftime('%w', started_at, 'unixepoch', 'localtime') AS INTEGER) AS day_of_week,
             COUNT(*) AS play_count
         FROM play_start

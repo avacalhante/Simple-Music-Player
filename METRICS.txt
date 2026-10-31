@@ -101,14 +101,42 @@ MOST PLAYED TRACKS / ARTISTS / ALBUMS / GENRES
   side records no artist/album/genre keys; joining them to the library is
   a read of rows we already resolved.
 
-LISTENING BY HOUR / BY DAY OF WEEK
+AVERAGE LISTENING HOURS BY WEEKDAY
 
-  hour        CAST(strftime('%H', started_at,'unixepoch','localtime') AS INT)
+  One row per weekday that has at least one closed session, in `%w` order
+  (Sunday first). Averaged over that weekday's closed sessions:
+
+    start_minutes = local minute-of-day of the session start
+                    (hour * 60 + minute, 0 .. 1439)
+    length_seconds = the same session length as above, clamping included
+
+  Both are plain AVG()s. The row shows "start – start + length", each side
+  rounded to the nearest minute, so a Tuesday whose sessions average a
+  20:36 start and 3:54 of listening reads "Tuesday 20:36 – 20:40".
+  [ListeningSessionDao.getWeekdaySessionWindows]
+
+  The end is therefore the mean start plus the mean length, not the mean
+  of the session end times. For the same weekday all sessions usually
+  start in a similar band, so the two are close.
+
+  Caveats:
+    * The start is an arithmetic mean of minutes since midnight, so a
+      weekday with sessions on both sides of midnight would average
+      towards midday. Rare, and not corrected.
+    * A session ending after midnight wraps: a 23:30 start with 2 hours
+      shows 01:30 as the end.
+    * A weekday with a single session shows that one session's window.
+      Rows become meaningful as history accumulates.
+    * Sessions with no recorded length (the interrupted-play case below)
+      pull the average down instead of being dropped.
+
+PLAYS BY DAY OF WEEK
+
   day of week CAST(strftime('%w', started_at,'unixepoch','localtime') AS INT)
               0 = Sunday .. 6 = Saturday
-  Both GROUP BY the bucket, ordered by play count descending, so the
-  busiest hour and the busiest weekday come first. Only buckets with plays
-  are shown.
+  GROUP BY the bucket, ordered by play count descending, so the busiest
+  weekday comes first. Only weekdays with plays are shown. This counts
+  plays; the section above averages whole sessions.
 
 NOT PLAYED RECENTLY  ("forgotten favorites")
 
@@ -180,7 +208,8 @@ LISTENING TIME BY DAY
   getFirstTrackPerDay       MIN(started_at) per day. NOTE: this one buckets
                             on `started_at / 86400`, i.e. UTC days, unlike
                             the local-time buckets above.
-  getHourlyStats / getDayOfWeekStats exist in the local-time form only.
+  getDayOfWeekStats / getWeekdaySessionWindows use local time only;
+                            there is no UTC variant.
   getPlaylistStats / getPlaylistListeningTimeInPeriod   per playlist_id,
                             currently only meaningful for the all-tracks
                             root (see attribution below).
