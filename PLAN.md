@@ -65,12 +65,20 @@ Acceptance: no `DELETE FROM queue_items` / bulk insert during normal playback; q
 
 ## Phase 3 — Make the media tree build cheap
 
-- [ ] Load the library once and group in memory by `albumId` / `artistId` / `genreId` / `folderName` / `playListId`, instead of one query per album/artist/folder/genre/playlist. Deduplicate by `mediaStoreId` (rows are duplicated per playlist).
-- [ ] Build each `MediaItem` once and reuse it for both the tree node and `titleMap`.
-- [ ] Rebuild lazily: mark the provider dirty after a scan and build on the first `onGetLibraryRoot` / `onGetChildren` request instead of at service start and after every scan.
-- [ ] Confirm nothing else depends on `MediaItemProvider` being ready immediately; `MediaSessionCallback` has `callWhenSourceReady` for this.
+Status: done on `feat/media-tree`, verified on the Android 13 device.
 
-Acceptance: media browser still works; startup after a scan no longer performs hundreds/thousands of queries.
+- [x] Load the library once and group in memory by `albumId` / `artistId` / `genreId` / `folderName` / `playListId`, instead of one query per album/artist/folder/genre/playlist. `AudioHelper.getLibraryTracks()` returns both the deduplicated `all` list and the raw `byPlaylist` memberships, so playlist contents are not lost to the per-playlist row copies.
+- [x] Build each `MediaItem` once and reuse it for both the tree node and `titleMap`.
+- [x] Rebuild lazily: `reload()` only invalidates the tree; `onGetLibraryRoot` starts the build, and `onGetChildren` / `onGetItem` / `onSubscribe` wait through `whenReady()`. `reloadContent()` does nothing when no browser is subscribed. A reload that arrives while a build is running schedules one rebuild after it.
+- [x] Confirm nothing else depends on `MediaItemProvider` being ready immediately; `MediaSessionCallback` has `callWhenSourceReady` for this. `onAddMediaItems` is deliberately not gated: it resolves items on a background thread, from the tree if it exists or with chunked database queries otherwise. In-app playback therefore never waits for the browser tree.
+- [x] Split the build and queue-persistence executors so a slow tree build cannot delay queue saves.
+
+Notes:
+- Folder children are grouped by the lowercased folder name to mirror the existing `COLLATE NOCASE` query.
+- Playlist media items now carry their real track count instead of `0`.
+- The tree keeps the previous node-registration order and numeric media-id namespace, so browsing behaviour is unchanged.
+
+Acceptance: media browser still works; startup after a scan no longer performs hundreds/thousands of queries. Verified with a temporary debug broadcast harness: 988 tracks, 855 albums, 320 artists, 20 folders and 1 playlist were grouped correctly; the first build took ~2.0 s and a warm rebuild ~0.3 s. No build ran at service start or after a scan with no browser subscribed, a reload rebuilt only on the next request, and a reload during a build produced exactly one extra build and one ready callback. In-app playback from a cold start (no tree) still started correctly through the batched fallback, with no Room main-thread errors.
 
 ## Phase 4 — Cheap list/scan cleanups
 

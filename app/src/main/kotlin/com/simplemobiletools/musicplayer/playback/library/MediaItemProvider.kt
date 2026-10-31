@@ -21,8 +21,7 @@ import com.simplemobiletools.musicplayer.helpers.TAB_FOLDERS
 import com.simplemobiletools.musicplayer.helpers.TAB_GENRES
 import com.simplemobiletools.musicplayer.helpers.TAB_PLAYLISTS
 import com.simplemobiletools.musicplayer.helpers.TAB_TRACKS
-import com.simplemobiletools.musicplayer.models.QueueItem
-import com.simplemobiletools.musicplayer.models.toMediaItems
+import com.simplemobiletools.musicplayer.models.*
 import java.util.concurrent.Executors
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -30,6 +29,9 @@ private const val STATE_CREATED = 1
 private const val STATE_INITIALIZING = 2
 private const val STATE_INITIALIZED = 3
 private const val STATE_ERROR = 4
+
+// SQLite allows at most 999 variables per statement
+private const val MEDIA_STORE_ID_CHUNK = 900
 
 private const val SMP_ROOT_ID = "__ROOT__"
 private const val SMP_PLAYLISTS_ROOT_ID = "__PLAYLISTS__"
@@ -41,60 +43,73 @@ private const val SMP_GENRES_ROOT_ID = "__GENRES__"
 
 /**
  * This is not (yet) used internally and currently only required (mostly) for media browser's outside the app.
+ *
+ * The tree is built lazily on the first browser request and rebuilt from a single set of queries,
+ * since the previous implementation ran one query per album/artist/folder/genre/playlist.
  */
 @UnstableApi
 internal class MediaItemProvider(private val context: Context) {
-    private val executor by lazy {
+    private val treeExecutor by lazy {
         MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor())
     }
 
-    inner class MediaItemNode(val item: MediaItem) {
-        private val children: MutableList<MediaItem> = ArrayList()
-        fun addChild(mediaId: String) = children.add(treeNodes[mediaId]!!.item)
-        fun getChildren() = children.toList()
+    private val persistenceExecutor by lazy {
+        MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor())
     }
 
-    private val treeNodes = mutableMapOf<String, MediaItemNode>()
-    private var titleMap: MutableMap<String, MediaItemNode> = mutableMapOf()
+    private val audioHelper = context.audioHelper
+    private val lock = Any()
+
+    @Volatile
+    private var state: Int = STATE_CREATED
+    private var rebuildRequested = false
     private val onReadyListeners = mutableListOf<(Boolean) -> Unit>()
+
+    @Volatile
+    private var treeNodes: Map<String, MediaItemNode> = emptyMap()
+
+    @Volatile
+    private var titleMap: Map<String, MediaItem> = emptyMap()
 
     // ids of the queue as it was last written to the database, used to skip needless rewrites
     private var savedQueueIds: List<Long>? = null
 
-    private var state: Int = STATE_CREATED
-        set(value) {
-            if (value == STATE_INITIALIZED || value == STATE_ERROR) {
-                synchronized(onReadyListeners) {
-                    field = value
-                    Handler(Looper.getMainLooper()).post {
-                        onReadyListeners.forEach { listener ->
-                            listener(state == STATE_INITIALIZED)
-                        }
-                    }
-                }
-            } else {
-                field = value
+    init {
+        // the root and its category nodes do not need any database access, so they are always available
+        treeNodes = TreeBuilder(buildRootItem(), RootCategories.buildRootChildren(context)).nodes
+    }
+
+    /**
+     * Starts building the tree unless it is already being built or has been built.
+     */
+    fun ensureBuilt() {
+        synchronized(lock) {
+            if (state == STATE_CREATED) {
+                startBuildLocked()
             }
         }
-
-    private val audioHelper = context.audioHelper
-
-    init {
-        buildRoot()
     }
 
     fun whenReady(performAction: (Boolean) -> Unit): Boolean {
-        return when (state) {
-            STATE_CREATED, STATE_INITIALIZING -> {
-                onReadyListeners += performAction
-                false
-            }
+        var completedState: Int? = null
+        synchronized(lock) {
+            when (state) {
+                STATE_CREATED -> {
+                    startBuildLocked()
+                    onReadyListeners += performAction
+                }
 
-            else -> {
-                performAction(state != STATE_ERROR)
-                true
+                STATE_INITIALIZING -> onReadyListeners += performAction
+                else -> completedState = state
             }
         }
+
+        completedState?.let {
+            performAction(it == STATE_INITIALIZED)
+            return true
+        }
+
+        return false
     }
 
     operator fun get(mediaId: String): MediaItem? {
@@ -108,27 +123,64 @@ internal class MediaItemProvider(private val context: Context) {
         return mediaItem
     }
 
+    /**
+     * Returns an already built item without touching the database.
+     */
+    fun getCachedItem(mediaId: String) = getNode(mediaId)?.item
+
+    /**
+     * Resolves tracks that are not in the tree yet, using a few chunked queries instead of one per id.
+     */
+    fun getItemsByIds(mediaStoreIds: Collection<Long>): Map<Long, MediaItem> {
+        if (mediaStoreIds.isEmpty()) {
+            return emptyMap()
+        }
+
+        return mediaStoreIds.distinct()
+            .chunked(MEDIA_STORE_ID_CHUNK)
+            .flatMap { context.tracksDAO.getTracksWithMediaStoreIds(it) }
+            .associateBy { it.mediaStoreId }
+            .mapValues { (_, track) -> track.toMediaItem() }
+    }
+
     fun getRootItem() = get(SMP_ROOT_ID)!!
 
     fun getChildren(id: String) = getNode(id)?.getChildren()
 
     fun getRandomItem(): MediaItem {
+        if (state != STATE_INITIALIZED) {
+            // do not wait for the tree, the database has the same information
+            context.tracksDAO.getRandomTrack()?.let { return it.toMediaItem() }
+        }
+
         var curRoot = getRootItem()
         while (curRoot.mediaMetadata.isBrowsable == true) {
-            val children = getChildren(curRoot.mediaId)!!
+            val children = getChildren(curRoot.mediaId).orEmpty()
+            if (children.isEmpty()) {
+                break
+            }
             curRoot = children.random()
         }
+
         return curRoot
     }
 
     fun getItemFromSearch(searchQuery: String): MediaItem? {
-        var mediaItem = titleMap[searchQuery]?.item
+        var mediaItem = titleMap[searchQuery]
         if (mediaItem == null) {
-            val partialMatch = titleMap.keys.find { it.contains(searchQuery) } ?: return null
-            mediaItem = titleMap[partialMatch]?.item
+            val partialMatch = titleMap.keys.find { it.contains(searchQuery) }
+            if (partialMatch != null) {
+                mediaItem = titleMap[partialMatch]
+            }
         }
 
-        return mediaItem
+        if (mediaItem != null) {
+            return mediaItem
+        }
+
+        // the tree may not be built yet, or the track may have been added since
+        return (context.tracksDAO.getTrackWithTitle(searchQuery)
+            ?: context.tracksDAO.getTrackWithTitleContaining(searchQuery))?.toMediaItem()
     }
 
     fun getDefaultQueue() = getChildren(SMP_TRACKS_ROOT_ID)
@@ -162,7 +214,7 @@ internal class MediaItemProvider(private val context: Context) {
             return
         }
 
-        executor.execute {
+        persistenceExecutor.execute {
             val trackIds = mediaItems.map { it.mediaId.toLong() }
             val currentTrackId = current.mediaId.toLong()
             val positionSeconds = startPosition.coerceAtLeast(0L).milliseconds.inWholeSeconds.toInt()
@@ -189,96 +241,182 @@ internal class MediaItemProvider(private val context: Context) {
      * Persists only the current track and its position, for playback events that do not change the queue.
      */
     fun saveCurrentTrackProgress(trackId: Long, startPosition: Long) {
-        executor.execute {
+        persistenceExecutor.execute {
             val positionSeconds = startPosition.coerceAtLeast(0L).milliseconds.inWholeSeconds.toInt()
             context.queueDAO.updateCurrentTrack(trackId, positionSeconds)
         }
     }
 
+    /**
+     * Invalidates the tree. It is rebuilt lazily on the next browser request, unless a build is already running,
+     * in which case a rebuild is queued after it.
+     */
     fun reload() {
-        state = STATE_INITIALIZING
-        executor.execute {
-            buildRoot()
-
-            try {
-                buildPlaylists()
-                buildFolders()
-                buildArtists()
-                buildAlbums()
-                buildTracks()
-                buildGenres()
-            } catch (e: Exception) {
-                state = STATE_ERROR
+        synchronized(lock) {
+            when (state) {
+                STATE_INITIALIZING -> rebuildRequested = true
+                STATE_INITIALIZED, STATE_ERROR -> state = STATE_CREATED
             }
-
-            state = STATE_INITIALIZED
         }
     }
 
-    private fun buildRoot() {
-        val root = buildMediaItem(
-            title = context.getString(com.simplemobiletools.commons.R.string.root),
-            mediaId = SMP_ROOT_ID,
-            mediaType = MediaMetadata.MEDIA_TYPE_FOLDER_MIXED
-        )
-        val rootChildren = RootCategories.buildRootChildren(context)
-        addNodeAndChildren(item = root, children = rootChildren)
+    private fun startBuildLocked() {
+        state = STATE_INITIALIZING
+        treeExecutor.execute { build() }
     }
 
-    private fun buildPlaylists() = with(audioHelper) {
-        getAllPlaylists().forEach { playlist ->
-            addNodeAndChildren(SMP_PLAYLISTS_ROOT_ID, playlist.toMediaItem(), getPlaylistTracks(playlist.id).map { it.toMediaItem() })
+    private fun build() {
+        val builtTree = try {
+            buildTree()
+        } catch (e: Exception) {
+            null
+        }
+
+        if (builtTree != null) {
+            treeNodes = builtTree.nodes
+            titleMap = builtTree.titleMap
+        }
+
+        val listeners: List<(Boolean) -> Unit>
+        val rebuild: Boolean
+        synchronized(lock) {
+            if (rebuildRequested) {
+                rebuildRequested = false
+                rebuild = true
+                listeners = emptyList()
+            } else {
+                rebuild = false
+                state = if (builtTree != null) STATE_INITIALIZED else STATE_ERROR
+                listeners = onReadyListeners.toList()
+                onReadyListeners.clear()
+            }
+        }
+
+        if (rebuild) {
+            // still on the single build thread, so recursing here avoids a second executor task
+            build()
+            return
+        }
+
+        if (listeners.isNotEmpty()) {
+            val success = builtTree != null
+            Handler(Looper.getMainLooper()).post {
+                listeners.forEach { listener -> listener(success) }
+            }
         }
     }
 
-    private fun buildFolders() = with(audioHelper) {
-        getAllFolders().forEach { folder ->
-            addNodeAndChildren(SMP_FOLDERS_ROOT_ID, folder.toMediaItem(), getFolderTracks(folder.title).map { it.toMediaItem() })
-        }
-    }
+    private fun buildTree(): BuiltTree {
+        val libraryTracks = audioHelper.getLibraryTracks()
+        val playlists = audioHelper.getAllPlaylists()
+        val folders = audioHelper.getAllFolders(libraryTracks.all)
+        val albums = audioHelper.getAllAlbums()
+        val artists = audioHelper.getAllArtists()
+        val genres = audioHelper.getAllGenres()
 
-    private fun buildArtists() = with(audioHelper) {
-        getAllArtists().forEach { artist ->
-            addNodeAndChildren(SMP_ARTISTS_ROOT_ID, artist.toMediaItem(), getArtistAlbums(artist.id).map { it.toMediaItem() })
-        }
-    }
+        val tracksByAlbum = libraryTracks.all.groupBy { it.albumId }
+        val tracksByGenre = libraryTracks.all.groupBy { it.genreId }
+        val tracksByFolder = libraryTracks.all.groupBy { it.folderName.lowercase() }
+        val albumsByArtist = albums.groupBy { it.artistId }
 
-    private fun buildAlbums() = with(audioHelper) {
-        getAllAlbums().forEach { album ->
-            addNodeAndChildren(SMP_ALBUMS_ROOT_ID, album.toMediaItem(), getAlbumTracks(album.id).map { it.toMediaItem() })
-        }
-    }
+        val tree = TreeBuilder(buildRootItem(), RootCategories.buildRootChildren(context))
+        val trackItems = HashMap<Long, MediaItem>()
 
-    private fun buildTracks() = with(audioHelper) {
-        getAllTracks().forEach { track ->
-            addNodeAndChildren(SMP_TRACKS_ROOT_ID, track.toMediaItem())
-            titleMap[track.title.lowercase()] = MediaItemNode(track.toMediaItem())
-        }
-    }
+        fun trackItem(track: Track): MediaItem = trackItems.getOrPut(track.mediaStoreId) { track.toMediaItem() }
 
-    private fun buildGenres() = with(audioHelper) {
-        getAllGenres().forEach { genre ->
-            addNodeAndChildren(SMP_GENRES_ROOT_ID, genre.toMediaItem(), getGenreTracks(genre.id).map { it.toMediaItem() })
+        playlists.forEach { playlist ->
+            val tracks = ArrayList(libraryTracks.byPlaylist[playlist.id].orEmpty())
+            tracks.sortSafely(context.config.getProperPlaylistSorting(playlist.id))
+            val item = playlist.copy(trackCount = tracks.size).toMediaItem()
+            tree.add(item, SMP_PLAYLISTS_ROOT_ID)
+            tree.addAll(tracks.map { trackItem(it) }, item.mediaId)
         }
+
+        folders.forEach { folder ->
+            val tracks = ArrayList(tracksByFolder[folder.title.lowercase()].orEmpty())
+            tracks.sortSafely(context.config.getProperFolderSorting(folder.title))
+            val item = folder.toMediaItem()
+            tree.add(item, SMP_FOLDERS_ROOT_ID)
+            tree.addAll(tracks.map { trackItem(it) }, item.mediaId)
+        }
+
+        val albumItems = albums.associate { it.id to it.toMediaItem() }
+
+        artists.forEach { artist ->
+            val artistAlbums = albumsByArtist[artist.id].orEmpty().mapNotNull { albumItems[it.id] }
+            val item = artist.toMediaItem()
+            tree.add(item, SMP_ARTISTS_ROOT_ID)
+            tree.addAll(artistAlbums, item.mediaId)
+        }
+
+        albums.forEach { album ->
+            val tracks = tracksByAlbum[album.id].orEmpty()
+                .sortedWith(compareBy({ it.trackId }, { it.title.lowercase() }))
+            val item = albumItems.getValue(album.id)
+            tree.add(item, SMP_ALBUMS_ROOT_ID)
+            tree.addAll(tracks.map { trackItem(it) }, item.mediaId)
+        }
+
+        libraryTracks.all.forEach { track ->
+            val item = trackItem(track)
+            tree.add(item, SMP_TRACKS_ROOT_ID)
+            tree.titleMap[track.title.lowercase()] = item
+        }
+
+        genres.forEach { genre ->
+            val item = genre.toMediaItem()
+            tree.add(item, SMP_GENRES_ROOT_ID)
+            tree.addAll(tracksByGenre[genre.id].orEmpty().map { trackItem(it) }, item.mediaId)
+        }
+
+        return BuiltTree(tree.nodes, tree.titleMap)
     }
 
     private fun getNode(id: String) = treeNodes[id]
 
-    private fun addNodeAndChildren(parentId: String? = null, item: MediaItem, children: List<MediaItem>? = null) {
-        val itemNode = MediaItemNode(item)
-        treeNodes[item.mediaId] = itemNode
+    private fun getMediaItemFromQueueItem(queueItem: QueueItem) = getNode(queueItem.trackId.toString())?.item
 
-        children?.forEach { child ->
-            treeNodes[child.mediaId] = MediaItemNode(child)
-            itemNode.addChild(child.mediaId)
-        }
+    private fun buildRootItem() = buildMediaItem(
+        title = context.getString(com.simplemobiletools.commons.R.string.root),
+        mediaId = SMP_ROOT_ID,
+        mediaType = MediaMetadata.MEDIA_TYPE_FOLDER_MIXED
+    )
+}
 
-        if (parentId != null) {
-            getNode(parentId)?.addChild(item.mediaId)
+private class MediaItemNode(val item: MediaItem) {
+    private val children: MutableList<MediaItem> = ArrayList()
+
+    fun addChild(item: MediaItem) = children.add(item)
+
+    fun getChildren() = children.toList()
+}
+
+private class BuiltTree(
+    val nodes: Map<String, MediaItemNode>,
+    val titleMap: Map<String, MediaItem>
+)
+
+private class TreeBuilder(rootItem: MediaItem, categories: List<MediaItem>) {
+    val nodes = HashMap<String, MediaItemNode>()
+    val titleMap = HashMap<String, MediaItem>()
+
+    init {
+        val rootNode = MediaItemNode(rootItem)
+        nodes[rootItem.mediaId] = rootNode
+        categories.forEach {
+            nodes[it.mediaId] = MediaItemNode(it)
+            rootNode.addChild(it)
         }
     }
 
-    private fun getMediaItemFromQueueItem(queueItem: QueueItem) = getNode(queueItem.trackId.toString())?.item
+    fun add(item: MediaItem, parentId: String? = null) {
+        nodes[item.mediaId] = MediaItemNode(item)
+        if (parentId != null) {
+            nodes[parentId]?.addChild(item)
+        }
+    }
+
+    fun addAll(items: List<MediaItem>, parentId: String) = items.forEach { add(it, parentId) }
 }
 
 private enum class RootCategories(@StringRes val titleRes: Int, @DrawableRes val drawableRes: Int, val mediaId: String, val mediaType: @MediaType Int) {

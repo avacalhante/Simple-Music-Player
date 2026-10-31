@@ -30,8 +30,27 @@ class AudioHelper(private val context: Context) {
         return tracks
     }
 
+    /**
+     * Loads the whole library with a single tracks query. [LibraryTracks.all] is deduplicated across playlists,
+     * while [LibraryTracks.byPlaylist] keeps one entry per playlist membership for the media browser.
+     */
+    fun getLibraryTracks(): LibraryTracks {
+        val rows = context.tracksDAO.getAll()
+        val tracks = rows.applyProperFilenames(config.showFilename)
+        tracks.sortSafely(config.trackSorting)
+
+        val tracksByPlaylist = rows.groupBy { it.playListId }.mapValues { (_, playlistRows) ->
+            playlistRows.applyProperFilenames(config.showFilename)
+        }
+
+        return LibraryTracks(tracks, tracksByPlaylist)
+    }
+
     fun getAllFolders(): ArrayList<Folder> {
-        val tracks = context.audioHelper.getAllTracks()
+        return getAllFolders(getAllTracks())
+    }
+
+    fun getAllFolders(tracks: List<Track>): ArrayList<Folder> {
         val foldersMap = tracks.groupBy { it.folderName }
         val folders = ArrayList<Folder>()
         val excludedFolders = config.excludedFolders
@@ -310,3 +329,8 @@ private fun Collection<Track>.applyProperFilenames(showFilename: Int): ArrayList
     return distinctBy { "${it.path}/${it.mediaStoreId}" }
         .onEach { it.title = it.getProperTitle(showFilename) } as ArrayList<Track>
 }
+
+class LibraryTracks(
+    val all: ArrayList<Track>,
+    val byPlaylist: Map<Int, ArrayList<Track>>
+)

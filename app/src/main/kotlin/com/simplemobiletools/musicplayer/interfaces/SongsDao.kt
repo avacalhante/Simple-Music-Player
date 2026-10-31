@@ -32,6 +32,18 @@ interface SongsDao {
     @Query("SELECT * FROM tracks WHERE media_store_id = :mediaStoreId")
     fun getTrackWithMediaStoreId(mediaStoreId: Long): Track?
 
+    @Query("SELECT * FROM tracks WHERE media_store_id IN (:mediaStoreIds)")
+    fun getTracksWithMediaStoreIds(mediaStoreIds: List<Long>): List<Track>
+
+    @Query("SELECT * FROM tracks WHERE title = :title COLLATE NOCASE LIMIT 1")
+    fun getTrackWithTitle(title: String): Track?
+
+    @Query("SELECT * FROM tracks WHERE title LIKE '%' || :query || '%' LIMIT 1")
+    fun getTrackWithTitleContaining(query: String): Track?
+
+    @Query("SELECT * FROM tracks ORDER BY RANDOM() LIMIT 1")
+    fun getRandomTrack(): Track?
+
     @Query("SELECT * FROM tracks WHERE genre_id = :genreId")
     fun getGenreTracks(genreId: Long): List<Track>
 

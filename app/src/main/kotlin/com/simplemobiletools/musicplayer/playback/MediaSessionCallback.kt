@@ -91,6 +91,9 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
             return Futures.immediateFuture(LibraryResult.ofError(LibraryResult.RESULT_ERROR_NOT_SUPPORTED))
         }
 
+        // the root is available immediately, start loading the children in the background
+        mediaItemProvider.ensureBuilt()
+
         return Futures.immediateFuture(
             LibraryResult.ofItem(
                 mediaItemProvider.getRootItem(),
@@ -191,15 +194,27 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
         controller: MediaSession.ControllerInfo,
         mediaItems: List<MediaItem>
     ): ListenableFuture<List<MediaItem>> {
-        val items = mediaItems.map { mediaItem ->
-            if (mediaItem.requestMetadata.searchQuery != null) {
-                getMediaItemFromSearchQuery(mediaItem.requestMetadata.searchQuery!!)
-            } else {
-                mediaItemProvider[mediaItem.mediaId] ?: mediaItem
+        // run on a background thread: resolving an item may fall back to a database lookup, and this callback
+        // runs on the application thread
+        return executorService.submit<List<MediaItem>> {
+            val idsToResolve = mediaItems.filter {
+                it.requestMetadata.searchQuery == null &&
+                    it.localConfiguration == null &&
+                    mediaItemProvider.getCachedItem(it.mediaId) == null
+            }.mapNotNull { it.mediaId.toLongOrNull() }
+            val resolvedItems = mediaItemProvider.getItemsByIds(idsToResolve)
+
+            mediaItems.map { mediaItem ->
+                val searchQuery = mediaItem.requestMetadata.searchQuery
+                when {
+                    searchQuery != null -> getMediaItemFromSearchQuery(searchQuery)
+                    mediaItem.localConfiguration != null -> mediaItem
+                    else -> mediaItemProvider.getCachedItem(mediaItem.mediaId)
+                        ?: resolvedItems[mediaItem.mediaId.toLongOrNull()]
+                        ?: mediaItem
+                }
             }
         }
-
-        return Futures.immediateFuture(items)
     }
 
     private fun getMediaItemFromSearchQuery(query: String): MediaItem {
@@ -208,6 +223,11 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
 
     private fun reloadContent() {
         mediaItemProvider.reload()
+        if (browsers.isEmpty()) {
+            // no browser is subscribed, the tree will be rebuilt on the next request
+            return
+        }
+
         mediaItemProvider.whenReady {
             val rootItem = mediaItemProvider.getRootItem()
             val rootItemCount = mediaItemProvider.getChildren(rootItem.mediaId)?.size ?: 0
