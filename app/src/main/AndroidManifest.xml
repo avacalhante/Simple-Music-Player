@@ -108,6 +108,13 @@
             android:parentActivityName=".activities.MainActivity" />
 
         <activity
+            android:name=".activities.StatsActivity"
+            android:configChanges="orientation"
+            android:exported="false"
+            android:label="@string/listening_stats"
+            android:parentActivityName=".activities.MainActivity" />
+
+        <activity
             android:name=".activities.AlbumsActivity"
             android:configChanges="orientation"
             android:exported="false"

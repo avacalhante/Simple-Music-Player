@@ -32,6 +32,17 @@ internal fun PlaybackService.getPlayerListener() = object : Player.Listener {
         ) {
             // only the current track and its position changed, keep the rest of the queue as it is
             saveCurrentTrackProgress()
+            analyticsBridge.onPositionUpdated(player.currentPosition, player.duration)
+        }
+    }
+
+    override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+        // this fires before onMediaItemTransition, so the outgoing track is still the current one.
+        // only an actual media item change ends the play attempt, a seek within a track does not.
+        val oldMediaId = oldPosition.mediaItem?.mediaId
+        val newMediaId = newPosition.mediaItem?.mediaId
+        if (oldMediaId != null && oldMediaId != newMediaId) {
+            analyticsBridge.onTrackEnd(oldPosition.positionMs)
         }
     }
 
@@ -45,6 +56,13 @@ internal fun PlaybackService.getPlayerListener() = object : Player.Listener {
                 }
             }
         }
+
+        // A repeat transition restarts the same item, so the previous attempt ends here.
+        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+            analyticsBridge.onTrackEnd()
+        }
+
+        mediaItem?.let { analyticsBridge.onTrackStart(it) }
     }
 
     override fun onRepeatModeChanged(repeatMode: Int) {

@@ -153,6 +153,7 @@ class MainActivity : SimpleMusicActivity() {
                 R.id.import_playlist -> tryImportPlaylist()
                 R.id.equalizer -> launchEqualizer()
                 R.id.more_apps_from_us -> launchMoreAppsFromUsIntent()
+                R.id.listening_stats -> launchStats()
                 R.id.settings -> launchSettings()
                 R.id.about -> launchAbout()
                 else -> return@setOnMenuItemClickListener false
@@ -509,6 +510,11 @@ class MainActivity : SimpleMusicActivity() {
     private fun launchEqualizer() {
         hideKeyboard()
         startActivity(Intent(applicationContext, EqualizerActivity::class.java))
+    }
+
+    private fun launchStats() {
+        hideKeyboard()
+        startActivity(Intent(applicationContext, StatsActivity::class.java))
     }
 
     private fun launchSettings() {

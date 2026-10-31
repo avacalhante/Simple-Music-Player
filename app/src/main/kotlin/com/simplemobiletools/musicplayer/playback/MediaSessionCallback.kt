@@ -113,6 +113,7 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
         params: MediaLibraryService.LibraryParams?
     ) = callWhenSourceReady {
         currentRoot = parentId
+        analyticsBridge.setRootContext(parentId)
         val children = mediaItemProvider.getChildren(parentId)
             ?: return@callWhenSourceReady LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
 

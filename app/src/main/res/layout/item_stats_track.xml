@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/normal_margin"
+    android:paddingTop="@dimen/activity_margin"
+    android:paddingEnd="@dimen/medium_margin"
+    android:paddingBottom="@dimen/activity_margin">
+
+    <com.simplemobiletools.commons.views.MyTextView
+        android:id="@+id/stats_track_rank"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:ems="2"
+        android:gravity="end"
+        android:paddingEnd="@dimen/small_margin"
+        android:textSize="@dimen/bigger_text_size"
+        tools:text="1" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/normal_margin">
+
+        <com.simplemobiletools.commons.views.MyTextView
+            android:id="@+id/stats_track_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textSize="@dimen/bigger_text_size"
+            tools:text="Track title" />
+
+        <com.simplemobiletools.commons.views.MyTextView
+            android:id="@+id/stats_track_info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:alpha="0.6"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textSize="@dimen/normal_text_size"
+            tools:text="Artist • Album" />
+
+    </LinearLayout>
+
+    <com.simplemobiletools.commons.views.MyTextView
+        android:id="@+id/stats_track_play_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:paddingStart="@dimen/normal_margin"
+        android:textSize="@dimen/normal_text_size"
+        tools:text="12 plays" />
+
+</LinearLayout>

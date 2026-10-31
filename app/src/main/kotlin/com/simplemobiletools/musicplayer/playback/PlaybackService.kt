@@ -14,6 +14,7 @@ import com.simplemobiletools.commons.extensions.showErrorToast
 import com.simplemobiletools.musicplayer.extensions.*
 import com.simplemobiletools.musicplayer.helpers.NotificationHelper
 import com.simplemobiletools.musicplayer.helpers.getPermissionToRequest
+import com.simplemobiletools.musicplayer.analytics.AnalyticsPlaybackBridge
 import com.simplemobiletools.musicplayer.playback.library.MediaItemProvider
 import com.simplemobiletools.musicplayer.playback.player.SimpleMusicPlayer
 import com.simplemobiletools.musicplayer.playback.player.initializeSessionAndPlayer
@@ -26,6 +27,7 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
     internal lateinit var playerHandler: Handler
     internal lateinit var mediaSession: MediaLibrarySession
     internal lateinit var mediaItemProvider: MediaItemProvider
+    internal lateinit var analyticsBridge: AnalyticsPlaybackBridge
 
     internal var currentRoot = ""
 
@@ -79,6 +81,8 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
         mediaItemProvider = MediaItemProvider(this)
         if (hasPermission(getPermissionToRequest())) {
             mediaItemProvider.reload()
+            // Attach analytics bridge after MediaItemProvider is available.
+            analyticsBridge = AnalyticsPlaybackBridge(this)
         } else {
             showNoPermissionNotification()
         }
@@ -88,6 +92,9 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
         mediaSession.release()
         withPlayer {
             removeListener(playerListener)
+            if (::analyticsBridge.isInitialized) {
+                analyticsBridge.close(currentPosition, duration)
+            }
             release()
         }
     }

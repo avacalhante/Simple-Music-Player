@@ -85,6 +85,15 @@
     <string name="exclude_folder_description">Excluding a folder will prevent the displaying of all audio files within. Files manually added to playlists will not be affected.</string>
     <string name="gapless_playback">Gapless playback</string>
     <string name="rescan_media">Rescan media</string>
+    <!-- Listening stats -->
+    <string name="listening_stats">Listening stats</string>
+    <string name="most_played_tracks">Most played tracks</string>
+    <string name="listening_time_by_day">Listening time by day</string>
+    <string name="no_listening_data">Nothing tracked yet. Play a few songs and come back.</string>
+    <plurals name="play_count">
+        <item quantity="one">%d play</item>
+        <item quantity="other">%d plays</item>
+    </plurals>
     <!-- FAQ -->
     <string name="faq_1_title">How can I fast-forward songs?</string>
     <string name="faq_1_text">You can click on the current or max duration texts near the seekbar, that will move the song either backward, or forward.</string>
