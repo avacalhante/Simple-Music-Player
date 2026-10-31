@@ -14,6 +14,9 @@ interface SongsDao {
     @Query("SELECT * FROM tracks")
     fun getAll(): List<Track>
 
+    @Query("SELECT COUNT(DISTINCT media_store_id) FROM tracks")
+    fun getDistinctTracksCount(): Int
+
     @Query("SELECT * FROM tracks WHERE playlist_id = :playlistId")
     fun getTracksFromPlaylist(playlistId: Int): List<Track>
 

@@ -3,6 +3,7 @@ package com.simplemobiletools.musicplayer.analytics
 import android.content.Context
 import com.simplemobiletools.musicplayer.analytics.daos.DailyStats
 import com.simplemobiletools.musicplayer.analytics.daos.DayOfWeekStats
+import com.simplemobiletools.musicplayer.analytics.daos.EngagementCounts
 import com.simplemobiletools.musicplayer.analytics.daos.FirstTrackPerDay
 import com.simplemobiletools.musicplayer.analytics.daos.HourlyStats
 import com.simplemobiletools.musicplayer.analytics.daos.LastPlayedPerTrack
@@ -78,33 +79,28 @@ class ListeningAnalyticsStore(private val context: Context) {
 
     fun totalPlayCount(): Int = playStartDao.getTotalPlayCount()
     fun distinctTrackCount(): Int = playStartDao.getDistinctTrackCount()
-    fun totalListeningSeconds(): Long {
-        // Sum completed play durations only; unfinished plays are excluded on purpose.
-        val ends = playEndDao.getAll()
-        return ends.sumOf { (it.endedAt - lookupStart(it.playStartId).startedAt).toLong() }
-    }
+    fun getPlayedTrackIds(): List<Long> = playStartDao.getDistinctTrackIds()
+
+    /**
+     * Sums how far each ended play actually got, clamped to the track duration.
+     * Plays that never ended have no recorded position and are left out.
+     */
+    fun totalListeningSeconds(): Long = playEndDao.getTotalListenedSeconds()
 
     // ---- completion / skip engagement ----
 
-    fun getCompletionRate(): Double {
-        val total = playEndDao.getTotalEndCount()
-        if (total == 0) return 0.0
-        val fullyPlayed = playEndDao.getFullyPlayedCount()
-        return fullyPlayed.toDouble() / total.toDouble()
-    }
+    fun getEngagementCounts(): EngagementCounts = playEndDao.getEngagementCounts()
 
-    fun getSkipRate(): Double {
-        val total = playEndDao.getTotalEndCount()
-        if (total == 0) return 0.0
-        val skipped = playEndDao.getSkippedCount()
-        return skipped.toDouble() / total.toDouble()
-    }
+    fun getCompletionRate(): Double = rateOf { it.fullyPlayedCount }
 
-    fun getQuickSkipRate(): Double {
-        val total = playEndDao.getTotalEndCount()
-        if (total == 0) return 0.0
-        val quickSkipped = playEndDao.getQuickSkippedCount()
-        return quickSkipped.toDouble() / total.toDouble()
+    fun getSkipRate(): Double = rateOf { it.skippedCount }
+
+    fun getQuickSkipRate(): Double = rateOf { it.quickSkipCount }
+
+    private fun rateOf(count: (EngagementCounts) -> Int): Double {
+        val engagement = playEndDao.getEngagementCounts()
+        if (engagement.endCount == 0) return 0.0
+        return count(engagement).toDouble() / engagement.endCount.toDouble()
     }
 
     fun getTracksStoppedPartway(minPlays: Int = 3, limit: Int = 50): List<TrackPartialStopStats> =
@@ -163,8 +159,4 @@ class ListeningAnalyticsStore(private val context: Context) {
     // ---- helpers ----
 
     private fun nowSeconds(): Int = (System.currentTimeMillis() / 1000L).toInt()
-
-    private fun lookupStart(playStartId: Long): PlayStart =
-        playStartDao.getById(playStartId)
-            ?: PlayStart(trackId = 0L, playlistId = 0, source = "", startedAt = 0)
 }

@@ -87,8 +87,18 @@
     <string name="rescan_media">Rescan media</string>
     <!-- Listening stats -->
     <string name="listening_stats">Listening stats</string>
+    <string name="summary">Summary</string>
+    <string name="total_plays">Total plays</string>
+    <string name="total_listening_time">Total listening time</string>
+    <string name="completion_rate">Finished tracks</string>
+    <string name="skip_rate">Skipped tracks</string>
+    <string name="never_played">Never played</string>
     <string name="most_played_tracks">Most played tracks</string>
+    <string name="most_played_artists">Most played artists</string>
+    <string name="most_played_albums">Most played albums</string>
     <string name="listening_time_by_day">Listening time by day</string>
+    <string name="not_tracked_yet">—</string>
+    <string name="never_played_summary">%1$d of %2$d</string>
     <string name="no_listening_data">Nothing tracked yet. Play a few songs and come back.</string>
     <plurals name="play_count">
         <item quantity="one">%d play</item>

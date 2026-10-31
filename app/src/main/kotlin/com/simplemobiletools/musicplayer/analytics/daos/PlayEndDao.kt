@@ -17,6 +17,30 @@ interface PlayEndDao {
     @Query("SELECT COUNT(*) FROM play_end")
     fun getTotalEndCount(): Int
 
+    @Query("""
+        SELECT COUNT(*) AS end_count,
+               COALESCE(SUM(CASE WHEN fully_played = 1 THEN 1 ELSE 0 END), 0) AS fully_played_count,
+               COALESCE(SUM(CASE WHEN skipped = 1 THEN 1 ELSE 0 END), 0) AS skipped_count,
+               COALESCE(SUM(CASE WHEN quick_skip = 1 THEN 1 ELSE 0 END), 0) AS quick_skip_count
+        FROM play_end
+    """)
+    fun getEngagementCounts(): EngagementCounts
+
+    @Query("""
+        SELECT COALESCE(
+                   SUM(
+                       CASE WHEN p.duration_seconds > 0
+                            THEN MIN(e.position_at_end, p.duration_seconds)
+                            ELSE e.position_at_end
+                       END
+                   ),
+                   0
+               )
+        FROM play_end e
+        JOIN play_start p ON p.id = e.play_start_id
+    """)
+    fun getTotalListenedSeconds(): Long
+
     @Query("SELECT COUNT(*) FROM play_end WHERE fully_played = 1")
     fun getFullyPlayedCount(): Int
 

@@ -44,6 +44,13 @@ data class LastPlayedPerTrack(
     @ColumnInfo(name = "last_played_at") val lastPlayedAt: Int
 )
 
+data class EngagementCounts(
+    @ColumnInfo(name = "end_count") val endCount: Int,
+    @ColumnInfo(name = "fully_played_count") val fullyPlayedCount: Int,
+    @ColumnInfo(name = "skipped_count") val skippedCount: Int,
+    @ColumnInfo(name = "quick_skip_count") val quickSkipCount: Int
+)
+
 data class TrackPartialStopStats(
     @ColumnInfo(name = "track_id") val trackId: Long,
     @ColumnInfo(name = "end_count") val endCount: Int,

@@ -26,6 +26,9 @@ interface PlayStartDao {
     @Query("SELECT COUNT(DISTINCT track_id) FROM play_start")
     fun getDistinctTrackCount(): Int
 
+    @Query("SELECT DISTINCT track_id FROM play_start")
+    fun getDistinctTrackIds(): List<Long>
+
     @Query("""
         SELECT track_id, COUNT(*) AS play_count
         FROM play_start

@@ -29,6 +29,21 @@
             android:orientation="vertical">
 
             <TextView
+                android:id="@+id/stats_summary_label"
+                style="@style/SettingsSectionLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/summary" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/stats_summary_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false" />
+
+            <include layout="@layout/divider" />
+
+            <TextView
                 android:id="@+id/stats_most_played_label"
                 style="@style/SettingsSectionLabelStyle"
                 android:layout_width="match_parent"
@@ -50,6 +65,38 @@
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/stats_most_played_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false" />
+
+            <include layout="@layout/divider" />
+
+            <TextView
+                android:id="@+id/stats_artists_label"
+                style="@style/SettingsSectionLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/most_played_artists" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/stats_artists_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false" />
+
+            <include
+                android:id="@+id/stats_artists_divider"
+                layout="@layout/divider" />
+
+            <TextView
+                android:id="@+id/stats_albums_label"
+                style="@style/SettingsSectionLabelStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/most_played_albums" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/stats_albums_list"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false" />
