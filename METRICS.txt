@@ -25,7 +25,8 @@ play_start  [table]
     duration_seconds  starts at 0 and is back-filled once the player
                     reports a duration (the media metadata does not carry
                     one in Media3 1.1.1)
-    session_id      reserved for sessions, always 0 for now
+    session_id      the listening session this play belongs to (0 when the
+                    play is not attributable to a session)
 
 play_end  [table]
   One row per attempt that ended. Written by `AnalyticsRecorder.onTrackEnd`,
@@ -53,6 +54,8 @@ play_end  [table]
   end-of-track leeway             3 seconds   [AnalyticsRecorder]
   repeat window                  10 minutes   [ListeningAnalytics]
   "not played recently"          90 days      [ListeningAnalytics]
+  session gap                     5 minutes   [ListeningAnalytics]
+  recent session rows shown         5         [StatsActivity]
   most played rows shown            20        [StatsActivity]
   rows sampled for aggregation      500        [StatsActivity]
   artist/album/genre rows shown      5        [StatsActivity]
@@ -117,6 +120,47 @@ NOT PLAYED RECENTLY  ("forgotten favorites")
   hidden when nothing has ever been played, and shows its empty text when
   everything played is recent.
 
+LISTENING SESSIONS / RECENT SESSIONS
+
+  A session is a stretch of continuous listening. `AnalyticsRecorder.onTrackStart`
+  keeps one open session in memory:
+
+    * no current session      -> open a new one at this play's started_at
+    * gap since the previous   -> close the current one and open a new one
+      play > 5 minutes
+    * otherwise               -> the play joins the current session
+
+  Closing sets listening_sessions.ended_at (a closed-marker only). Any session
+  left open by a process death is closed when the next play starts, and
+  `AnalyticsPlaybackBridge.close` (service shutdown) closes the current one.
+
+  Session length is NOT taken from ended_at - started_at, because that would
+  count idle time between the last track and the moment the session was
+  noticed to be over. It is derived from the plays instead [ListeningSessionDao]:
+
+    last_activity = MAX over the session's plays of
+                      COALESCE(play_end.ended_at,
+                               play_start.started_at + play_start.duration_seconds)
+    length = MIN(last_activity, ended_at) - started_at
+
+  The COALESCE fallback covers a play that never ended (the process went
+  away mid-track): its start plus its known duration is the best estimate of
+  how far it got. The outer MIN clamps the result to the moment the session
+  was closed, so an interrupted last play cannot make this session run into
+  the next one. Paused time between two plays is therefore excluded, and a
+  pause longer than the gap ends the session at the last play, not at the
+  resume.
+
+  Sessions                  COUNT of closed sessions (open ones excluded)
+  Average session length    sum(length) / count (integer division)
+  Longest session           max(length)
+  Average tracks per session  sum(track_count) / count, one decimal
+  Sessions with one song    sessions with exactly one play * 100 / count
+
+  Recent sessions lists the 5 newest closed sessions, newest first:
+  label = local start time, value = length + play count.
+
+
 LISTENING TIME BY DAY
 
   bucket   strftime('%Y-%m-%d', started_at,'unixepoch','localtime')
@@ -158,7 +202,12 @@ LISTENING TIME BY DAY
   * Counts survive library changes: play counts keep counting for tracks
     that were deleted, but the lists drop rows whose track is gone.
   * Percentages use integer division, so a rate can round down.
-  * Sessions are not recorded at all yet; play_start.session_id is 0.
+  * Sessions only split on a gap between two different plays. Pausing one
+    track for longer than the gap and resuming it does not end the session,
+    because no new play_start row is written. Sessions from before this
+    feature have session_id 0 and are not counted.
+  * A session interrupted by a crash stays open until the next play closes
+    it, so it is not shown until then.
   * Data never leaves the device. There is no analytics network call.
 
 If a threshold changes, it changes in one place: `ListeningAnalytics` for

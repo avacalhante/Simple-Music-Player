@@ -15,6 +15,8 @@ class AnalyticsRecorder(context: Context) {
     private var lastKnownPositionMs: Long = 0L
     private var lastKnownDurationMs: Long = 0L
     private var persistedDurationSeconds: Int = 0
+    private var currentSessionId: Long = 0L
+    private var lastTrackStartedAtSec: Int = 0
 
     fun onTrackStart(
         mediaItem: MediaItem,
@@ -38,9 +40,40 @@ class AnalyticsRecorder(context: Context) {
                 source = currentSource,
                 startedAt = currentStartedAt,
                 // filled in by onPositionChanged once the player knows the real duration
-                durationSeconds = 0
+                durationSeconds = 0,
+                sessionId = ensureSession(currentStartedAt)
             )
             currentPlayStartId = startId
+        }
+    }
+
+    /**
+     * Returns the session the play belongs to, opening a new one when the previous play is older than
+     * the session gap. Closing a session only marks it as finished; its length comes from its plays.
+     */
+    private fun ensureSession(nowSec: Int): Long {
+        if (currentSessionId > 0L) {
+            if (nowSec - lastTrackStartedAtSec > ListeningAnalytics.SESSION_GAP_SECONDS) {
+                analytics.closeSession(currentSessionId, nowSec)
+                currentSessionId = 0L
+            }
+        } else {
+            // a session can still be open after a process death, close it before starting a new one
+            analytics.getOpenSession()?.let { analytics.closeSession(it.id, nowSec) }
+        }
+
+        if (currentSessionId <= 0L) {
+            currentSessionId = analytics.openSession(nowSec)
+        }
+        lastTrackStartedAtSec = nowSec
+        return currentSessionId
+    }
+
+    /** Marks the current session as finished. Called when playback goes away, so the stats screen does not keep it open. */
+    fun onPlaybackStopped() {
+        if (currentSessionId > 0L) {
+            analytics.closeSession(currentSessionId, nowSeconds())
+            currentSessionId = 0L
         }
     }
 

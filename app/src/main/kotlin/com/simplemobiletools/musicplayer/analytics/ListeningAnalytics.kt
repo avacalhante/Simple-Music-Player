@@ -7,12 +7,15 @@ import com.simplemobiletools.musicplayer.analytics.daos.EngagementCounts
 import com.simplemobiletools.musicplayer.analytics.daos.FirstTrackPerDay
 import com.simplemobiletools.musicplayer.analytics.daos.HourlyStats
 import com.simplemobiletools.musicplayer.analytics.daos.LastPlayedPerTrack
+import com.simplemobiletools.musicplayer.analytics.daos.ListeningSessionDao
 import com.simplemobiletools.musicplayer.analytics.daos.MostPlayedTrack
 import com.simplemobiletools.musicplayer.analytics.daos.PlayEndDao
+import com.simplemobiletools.musicplayer.analytics.daos.SessionInfo
 import com.simplemobiletools.musicplayer.analytics.daos.TrackPartialStopStats
 import com.simplemobiletools.musicplayer.analytics.daos.PlaylistPlayStats
 import com.simplemobiletools.musicplayer.analytics.daos.PlaylistListeningTime
 import com.simplemobiletools.musicplayer.analytics.daos.TrackListeningTime
+import com.simplemobiletools.musicplayer.analytics.entities.ListeningSession
 import com.simplemobiletools.musicplayer.analytics.entities.PlayEnd
 import com.simplemobiletools.musicplayer.analytics.entities.PlayStart
 
@@ -20,6 +23,9 @@ object ListeningAnalytics {
     const val QUICK_SKIP_SECONDS = 15
     const val REPEAT_WINDOW_SECONDS = 10 * 60
     const val NOT_PLAYED_RECENTLY_DAYS = 90
+
+    /** Idle gap that ends a listening session: starting a track this long after the previous one begins a new session. */
+    const val SESSION_GAP_SECONDS = 5 * 60
 
     @Volatile
     private var store: ListeningAnalyticsStore? = null
@@ -35,10 +41,11 @@ class ListeningAnalyticsStore(private val context: Context) {
     private val db: AnalyticsDatabase by lazy { AnalyticsDatabase.getInstance(context) }
     private val playStartDao = db.playStartDao()
     private val playEndDao = db.playEndDao()
+    private val sessionDao = db.listeningSessionDao()
 
     // ---- raw persistence ----
 
-    fun recordPlayStart(trackId: Long, playlistId: Int, source: String, startedAt: Int, durationSeconds: Int): Long {
+    fun recordPlayStart(trackId: Long, playlistId: Int, source: String, startedAt: Int, durationSeconds: Int, sessionId: Long = 0L): Long {
         return playStartDao.insert(
             PlayStart(
                 trackId = trackId,
@@ -46,7 +53,7 @@ class ListeningAnalyticsStore(private val context: Context) {
                 source = source,
                 startedAt = startedAt,
                 durationSeconds = durationSeconds,
-                sessionId = 0L
+                sessionId = sessionId
             )
         )
     }
@@ -73,6 +80,25 @@ class ListeningAnalyticsStore(private val context: Context) {
                 quickSkip = if (quickSkip) 1 else 0
             )
         )
+    }
+
+    // ---- sessions ----
+
+    fun openSession(startedAt: Int): Long = sessionDao.insert(ListeningSession(startedAt = startedAt))
+
+    fun closeSession(sessionId: Long, endedAt: Int) {
+        if (sessionId > 0) {
+            sessionDao.closeSession(sessionId, endedAt)
+        }
+    }
+
+    fun getOpenSession(): ListeningSession? = sessionDao.getOpenSession()
+
+    fun getClosedSessionCount(): Int = sessionDao.getClosedSessionCount()
+
+    /** Closed sessions, newest first, with their length and number of tracks. */
+    fun getSessionInfo(): List<SessionInfo> = sessionDao.getSessionInfo().map {
+        it.copy(lengthSeconds = it.lengthSeconds.coerceAtLeast(0))
     }
 
     // ---- basic totals ----

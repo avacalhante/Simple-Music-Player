@@ -106,6 +106,13 @@
     <string name="not_tracked_yet">—</string>
     <string name="never_played_summary">%1$d of %2$d</string>
     <string name="no_listening_data">Nothing tracked yet. Play a few songs and come back.</string>
+    <string name="listening_sessions">Listening sessions</string>
+    <string name="session_count">Sessions</string>
+    <string name="average_session_length">Average session length</string>
+    <string name="longest_session">Longest session</string>
+    <string name="average_tracks_per_session">Average tracks per session</string>
+    <string name="single_song_sessions">Sessions with one song</string>
+    <string name="recent_sessions">Recent sessions</string>
     <plurals name="play_count">
         <item quantity="one">%d play</item>
         <item quantity="other">%d plays</item>

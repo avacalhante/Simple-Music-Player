@@ -33,7 +33,10 @@ class AnalyticsPlaybackBridge(service: PlaybackService) {
     }
 
     fun close(positionMs: Long? = null, durationMs: Long? = null) {
-        post { recorder.onTrackEnd(positionMs, durationMs) }
+        post {
+            recorder.onTrackEnd(positionMs, durationMs)
+            recorder.onPlaybackStopped()
+        }
     }
 
     private fun post(action: () -> Unit) {

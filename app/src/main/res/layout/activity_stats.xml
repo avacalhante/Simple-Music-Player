@@ -51,6 +51,50 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/stats_sessions_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/stats_sessions_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/listening_sessions" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_sessions_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_recent_sessions_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/stats_recent_sessions_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/recent_sessions" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_recent_sessions_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/stats_most_played_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

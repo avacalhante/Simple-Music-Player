@@ -17,6 +17,7 @@ import com.simplemobiletools.musicplayer.adapters.StatsValueAdapter
 import com.simplemobiletools.musicplayer.adapters.StatsValueRow
 import com.simplemobiletools.musicplayer.analytics.ListeningAnalyticsStore
 import com.simplemobiletools.musicplayer.analytics.daos.DailyStats
+import com.simplemobiletools.musicplayer.analytics.daos.SessionInfo
 import com.simplemobiletools.musicplayer.analytics.extensions.analytics
 import com.simplemobiletools.musicplayer.databinding.ActivityStatsBinding
 import com.simplemobiletools.musicplayer.extensions.tracksDAO
@@ -30,11 +31,13 @@ private const val AGGREGATE_LIMIT = 500
 private const val GROUP_LIMIT = 5
 private const val DAYS_LIMIT = 14
 private const val RESOLVE_CHUNK_SIZE = 400
+private const val RECENT_SESSIONS_LIMIT = 5
 
 class StatsActivity : SimpleActivity() {
 
     private val binding by viewBinding(ActivityStatsBinding::inflate)
     private val lastPlayedFormat = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
+    private val sessionDateFormat = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         isMaterialActivity = true
@@ -46,7 +49,8 @@ class StatsActivity : SimpleActivity() {
 
         arrayOf(
             binding.statsSummaryList, binding.statsMostPlayedList, binding.statsArtistsList, binding.statsAlbumsList,
-            binding.statsGenresList, binding.statsHoursList, binding.statsWeekdaysList, binding.statsForgottenList, binding.statsDailyList
+            binding.statsGenresList, binding.statsHoursList, binding.statsWeekdaysList, binding.statsForgottenList, binding.statsDailyList,
+            binding.statsSessionsList, binding.statsRecentSessionsList
         ).forEach {
             it.layoutManager = LinearLayoutManager(this)
         }
@@ -57,7 +61,8 @@ class StatsActivity : SimpleActivity() {
         setupToolbar(binding.statsToolbar, NavigationIcon.Arrow)
         arrayOf(
             binding.statsSummaryLabel, binding.statsMostPlayedLabel, binding.statsArtistsLabel, binding.statsAlbumsLabel,
-            binding.statsGenresLabel, binding.statsHoursLabel, binding.statsWeekdaysLabel, binding.statsForgottenLabel, binding.statsDailyLabel
+            binding.statsGenresLabel, binding.statsHoursLabel, binding.statsWeekdaysLabel, binding.statsForgottenLabel, binding.statsDailyLabel,
+            binding.statsSessionsLabel, binding.statsRecentSessionsLabel
         ).forEach {
             it.setTextColor(getProperPrimaryColor())
         }
@@ -90,6 +95,14 @@ class StatsActivity : SimpleActivity() {
             }
             val weekdayRows = analytics.getDayOfWeekStats().map { StatsRow(weekdayName(it.dayOfWeek), it.playCount) }
             val dailyStats: List<DailyStats> = analytics.getDailyStats(DAYS_LIMIT)
+            val sessions = analytics.getSessionInfo()
+            val sessionRows = buildSessionSummary(sessions)
+            val recentSessionRows = sessions.take(RECENT_SESSIONS_LIMIT).map { session ->
+                StatsValueRow(
+                    sessionDateFormat.format(session.startedAt * 1000L),
+                    "${session.lengthSeconds.getFormattedDuration()} · ${resources.getQuantityString(R.plurals.tracks_plural, session.trackCount, session.trackCount)}"
+                )
+            }
 
             runOnUiThread {
                 binding.statsSummaryList.adapter = StatsValueAdapter(summaryRows)
@@ -101,6 +114,8 @@ class StatsActivity : SimpleActivity() {
                 binding.statsWeekdaysList.adapter = StatsRowAdapter(weekdayRows)
                 binding.statsForgottenList.adapter = StatsTrackAdapter(forgottenRows)
                 binding.statsDailyList.adapter = DailyListeningAdapter(this, dailyStats)
+                binding.statsSessionsList.adapter = StatsValueAdapter(sessionRows)
+                binding.statsRecentSessionsList.adapter = StatsValueAdapter(recentSessionRows)
 
                 binding.statsMostPlayedEmpty.beVisibleIf(playedRows.isEmpty())
                 binding.statsDailyEmpty.beVisibleIf(dailyStats.isEmpty())
@@ -111,6 +126,8 @@ class StatsActivity : SimpleActivity() {
                 binding.statsHoursSection.beVisibleIf(hourRows.isNotEmpty())
                 binding.statsWeekdaysSection.beVisibleIf(weekdayRows.isNotEmpty())
                 binding.statsForgottenSection.beVisibleIf(playedRows.isNotEmpty())
+                binding.statsSessionsSection.beVisibleIf(sessionRows.isNotEmpty())
+                binding.statsRecentSessionsSection.beVisibleIf(recentSessionRows.isNotEmpty())
                 binding.statsForgottenEmpty.beVisibleIf(forgottenRows.isEmpty())
 
                 updateTextColors(binding.statsNestedScrollview)
@@ -141,6 +158,26 @@ class StatsActivity : SimpleActivity() {
         }
 
         return rows
+    }
+
+    private fun buildSessionSummary(sessions: List<SessionInfo>): List<StatsValueRow> {
+        if (sessions.isEmpty()) {
+            return emptyList()
+        }
+
+        val averageLength = sessions.sumOf { it.lengthSeconds } / sessions.size
+        val longestLength = sessions.maxOf { it.lengthSeconds }
+        val averageTracks = sessions.sumOf { it.trackCount }.toDouble() / sessions.size
+        val singleSongSessions = sessions.count { it.trackCount == 1 }
+        val singleSongRate = singleSongSessions * 100 / sessions.size
+
+        return arrayListOf(
+            StatsValueRow(getString(R.string.session_count), sessions.size.toString()),
+            StatsValueRow(getString(R.string.average_session_length), averageLength.getFormattedDuration()),
+            StatsValueRow(getString(R.string.longest_session), longestLength.getFormattedDuration()),
+            StatsValueRow(getString(R.string.average_tracks_per_session), String.format(Locale.getDefault(), "%.1f", averageTracks)),
+            StatsValueRow(getString(R.string.single_song_sessions), "$singleSongRate%")
+        )
     }
 
     private fun resolveTracks(mediaStoreIds: List<Long>): Map<Long, Track> {

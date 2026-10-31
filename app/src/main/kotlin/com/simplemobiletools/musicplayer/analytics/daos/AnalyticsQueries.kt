@@ -66,6 +66,13 @@ data class TrackListeningTime(
     @ColumnInfo(name = "end_count") val endCount: Int
 )
 
+data class SessionInfo(
+    @ColumnInfo(name = "id") val id: Long,
+    @ColumnInfo(name = "started_at") val startedAt: Int,
+    @ColumnInfo(name = "length_seconds") val lengthSeconds: Int,
+    @ColumnInfo(name = "track_count") val trackCount: Int
+)
+
 data class PlaylistListeningTime(
     @ColumnInfo(name = "playlist_id") val playlistId: Int,
     @ColumnInfo(name = "played_seconds") val playedSeconds: Long,
