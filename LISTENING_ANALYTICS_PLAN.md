@@ -151,9 +151,8 @@ Before sessions, the meaningful summaries are mostly per-track and per-period. I
 ## Still pending
 
 - Sessions: longest/average session, songs per session, time between sessions.
-- Most-listened time of day and day of week (queries exist, no UI yet).
-- Playlist and genre breakdowns, and real per-playlist attribution.
-- Discovery lists (never played / not played recently as track lists, not just a count).
+- Real per-playlist attribution, and genre/playlist breakdowns beyond play counts.
+- Never-played tracks as a list (currently only a count in the summary).
 - Periodic summaries and milestones.
 
 ## What I would not build yet
@@ -204,7 +203,7 @@ What actually exists on this branch:
 - `analytics/SessionContext.kt` — maps the current library root to `source`.
 - `analytics/AnalyticsExecutor.kt`, `analytics/extensions/AnalyticsContext.kt` — executor and `context.analytics`.
 
-Stats screen: `StatsActivity` (opened from the main menu) shows a summary (total plays, total listening time, finished vs skipped ratio, how many library tracks were never played), the 20 most played tracks resolved against the library, the five most played artists and albums derived from the 500 most played tracks, and listening time for the last 14 days. Daily buckets use device-local dates, and a day's listening time is the sum of the recorded end positions, so plays that never ended are excluded.
+Stats screen: `StatsActivity` (opened from the main menu) is one scroll of sections: a summary (total plays, total listening time, finished vs skipped ratio, how many library tracks were never played), the most played tracks, artists, albums and genres, listening by hour and by day of week, tracks not played in the last 90 days, and listening time for the last 14 local days. Daily buckets use device-local dates, and a day's listening time is the sum of the recorded end positions, so plays that never ended are excluded.
 
 End positions come from `Player.Listener.onPositionDiscontinuity`, which Media3 fires for the outgoing item before `onMediaItemTransition`; a same-item seek does not end the play attempt. On service shutdown the player's current position is recorded too.
 

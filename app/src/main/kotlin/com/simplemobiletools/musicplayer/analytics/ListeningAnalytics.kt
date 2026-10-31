@@ -151,6 +151,12 @@ class ListeningAnalyticsStore(private val context: Context) {
 
     fun getLastPlayedPerTrack(): List<LastPlayedPerTrack> = playStartDao.getLastPlayedPerTrack()
 
+    /** Played tracks whose most recent play is older than the threshold, oldest first. */
+    fun getTracksNotPlayedSince(days: Int = ListeningAnalytics.NOT_PLAYED_RECENTLY_DAYS, limit: Int = 20): List<LastPlayedPerTrack> {
+        val cutoff = (nowSeconds() - days * 86400L).toInt()
+        return playStartDao.getTracksNotPlayedSince(cutoff, limit)
+    }
+
     fun isPlayedRecently(trackId: Long): Boolean {
         val cutoff = nowSeconds() - ListeningAnalytics.NOT_PLAYED_RECENTLY_DAYS * 86400L
         return playStartDao.getPlayedRecentlyCount(trackId, cutoff.toInt()) > 0

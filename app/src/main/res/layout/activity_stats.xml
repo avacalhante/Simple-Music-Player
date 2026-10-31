@@ -28,107 +28,241 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/stats_summary_label"
-                style="@style/SettingsSectionLabelStyle"
+            <LinearLayout
+                android:id="@+id/stats_summary_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/summary" />
+                android:orientation="vertical">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/stats_summary_list"
+                <TextView
+                    android:id="@+id/stats_summary_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/summary" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_summary_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_most_played_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false" />
+                android:orientation="vertical">
 
-            <include layout="@layout/divider" />
+                <TextView
+                    android:id="@+id/stats_most_played_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/most_played_tracks" />
 
-            <TextView
-                android:id="@+id/stats_most_played_label"
-                style="@style/SettingsSectionLabelStyle"
+                <com.simplemobiletools.commons.views.MyTextView
+                    android:id="@+id/stats_most_played_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:paddingStart="@dimen/normal_margin"
+                    android:paddingTop="@dimen/normal_margin"
+                    android:paddingEnd="@dimen/normal_margin"
+                    android:paddingBottom="@dimen/normal_margin"
+                    android:text="@string/no_listening_data"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_most_played_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_artists_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/most_played_tracks" />
+                android:orientation="vertical">
 
-            <com.simplemobiletools.commons.views.MyTextView
-                android:id="@+id/stats_most_played_empty"
+                <TextView
+                    android:id="@+id/stats_artists_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/most_played_artists" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_artists_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_albums_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:alpha="0.7"
-                android:paddingStart="@dimen/normal_margin"
-                android:paddingTop="@dimen/normal_margin"
-                android:paddingEnd="@dimen/normal_margin"
-                android:paddingBottom="@dimen/normal_margin"
-                android:text="@string/no_listening_data"
-                android:visibility="gone"
-                tools:visibility="visible" />
+                android:orientation="vertical">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/stats_most_played_list"
+                <TextView
+                    android:id="@+id/stats_albums_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/most_played_albums" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_albums_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_genres_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false" />
+                android:orientation="vertical">
 
-            <include layout="@layout/divider" />
+                <TextView
+                    android:id="@+id/stats_genres_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/most_played_genres" />
 
-            <TextView
-                android:id="@+id/stats_artists_label"
-                style="@style/SettingsSectionLabelStyle"
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_genres_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_hours_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/most_played_artists" />
+                android:orientation="vertical">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/stats_artists_list"
+                <TextView
+                    android:id="@+id/stats_hours_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/listening_by_hour" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_hours_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_weekdays_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false" />
+                android:orientation="vertical">
 
-            <include
-                android:id="@+id/stats_artists_divider"
-                layout="@layout/divider" />
+                <TextView
+                    android:id="@+id/stats_weekdays_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/listening_by_day_of_week" />
 
-            <TextView
-                android:id="@+id/stats_albums_label"
-                style="@style/SettingsSectionLabelStyle"
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_weekdays_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_forgotten_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/most_played_albums" />
+                android:orientation="vertical">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/stats_albums_list"
+                <TextView
+                    android:id="@+id/stats_forgotten_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/not_played_recently" />
+
+                <com.simplemobiletools.commons.views.MyTextView
+                    android:id="@+id/stats_forgotten_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:paddingStart="@dimen/normal_margin"
+                    android:paddingTop="@dimen/normal_margin"
+                    android:paddingEnd="@dimen/normal_margin"
+                    android:paddingBottom="@dimen/normal_margin"
+                    android:text="@string/everything_played_recently"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_forgotten_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_daily_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false" />
+                android:orientation="vertical">
 
-            <include layout="@layout/divider" />
+                <TextView
+                    android:id="@+id/stats_daily_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/listening_time_by_day" />
 
-            <TextView
-                android:id="@+id/stats_daily_label"
-                style="@style/SettingsSectionLabelStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/listening_time_by_day" />
+                <com.simplemobiletools.commons.views.MyTextView
+                    android:id="@+id/stats_daily_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:paddingStart="@dimen/normal_margin"
+                    android:paddingTop="@dimen/normal_margin"
+                    android:paddingEnd="@dimen/normal_margin"
+                    android:paddingBottom="@dimen/normal_margin"
+                    android:text="@string/no_listening_data"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
 
-            <com.simplemobiletools.commons.views.MyTextView
-                android:id="@+id/stats_daily_empty"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:alpha="0.7"
-                android:paddingStart="@dimen/normal_margin"
-                android:paddingTop="@dimen/normal_margin"
-                android:paddingEnd="@dimen/normal_margin"
-                android:paddingBottom="@dimen/normal_margin"
-                android:text="@string/no_listening_data"
-                android:visibility="gone"
-                tools:visibility="visible" />
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_daily_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/stats_daily_list"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false" />
-
+            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

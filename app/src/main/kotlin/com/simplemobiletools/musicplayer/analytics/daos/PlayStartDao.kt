@@ -30,6 +30,16 @@ interface PlayStartDao {
     fun getDistinctTrackIds(): List<Long>
 
     @Query("""
+        SELECT track_id, MAX(started_at) AS last_played_at
+        FROM play_start
+        WHERE started_at < :cutoffEpochSeconds
+        GROUP BY track_id
+        ORDER BY last_played_at ASC
+        LIMIT :limit
+    """)
+    fun getTracksNotPlayedSince(cutoffEpochSeconds: Int, limit: Int): List<LastPlayedPerTrack>
+
+    @Query("""
         SELECT track_id, COUNT(*) AS play_count
         FROM play_start
         GROUP BY track_id
@@ -77,21 +87,21 @@ interface PlayStartDao {
 
     @Query("""
         SELECT
-            CAST((started_at / 3600) % 24 AS INTEGER) AS hour,
+            CAST(strftime('%H', started_at, 'unixepoch', 'localtime') AS INTEGER) AS hour,
             COUNT(*) AS play_count
         FROM play_start
         GROUP BY hour
-        ORDER BY hour
+        ORDER BY play_count DESC
     """)
     fun getHourlyStats(): List<HourlyStats>
 
     @Query("""
         SELECT
-            CAST(started_at / 86400 % 7 AS INTEGER) AS day_of_week,
+            CAST(strftime('%w', started_at, 'unixepoch', 'localtime') AS INTEGER) AS day_of_week,
             COUNT(*) AS play_count
         FROM play_start
         GROUP BY day_of_week
-        ORDER BY day_of_week
+        ORDER BY play_count DESC
     """)
     fun getDayOfWeekStats(): List<DayOfWeekStats>
 

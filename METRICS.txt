@@ -1,0 +1,165 @@
+LISTENING ANALYTICS — HOW THE METRICS ARE MEASURED
+===================================================
+
+Everything below lives in `analytics.db`, a Room database that is separate
+from `songs.db` (the library). Nothing here touches the library schema.
+Writes are posted to a single-thread executor ("AnalyticsExecutor"), so the
+player thread never waits on SQLite and the recorded event order is stable.
+
+Reading this file: [source] names the class or file, [table] names a table.
+
+
+1. RAW EVENTS
+-------------
+
+play_start  [table]
+  One row per track start. Written when Media3 reports a media item
+  transition to a new item (see `AnalyticsRecorder.onTrackStart`).
+
+    track_id        MediaStore id of the track (NOT the library Room row id)
+    playlist_id     all-tracks playlist id when the browse root was the
+                    tracks root, otherwise 0 (unknown)
+    source          browse root at the time: all_tracks, playlist, folder,
+                    artist, album, genre, or "unknown"
+    started_at      epoch seconds
+    duration_seconds  starts at 0 and is back-filled once the player
+                    reports a duration (the media metadata does not carry
+                    one in Media3 1.1.1)
+    session_id      reserved for sessions, always 0 for now
+
+play_end  [table]
+  One row per attempt that ended. Written by `AnalyticsRecorder.onTrackEnd`,
+  which is called from three places:
+
+    1. Player.onPositionDiscontinuity when the media id changed. Media3
+       dispatches this BEFORE onMediaItemTransition, so oldPosition.positionMs
+       is still the outgoing track's real position. A seek inside the same
+       track has the same media id and does not end the attempt.
+    2. Player.onMediaItemTransition with reason REPEAT (a restarted track
+       is a new attempt).
+    3. PlaybackService shutdown, using the player's current position.
+
+    ended_at        epoch seconds
+    position_at_end how far the track got, in seconds
+    fully_played    1 when position >= duration - 3 seconds
+    skipped         1 when not fully played (the complement of fully_played)
+    quick_skip      1 when skipped and position <= 15 seconds
+
+
+2. THRESHOLDS (defaults picked by judgement, not by measurement)
+----------------------------------------------------------------
+
+  quick skip window              15 seconds   [ListeningAnalytics]
+  end-of-track leeway             3 seconds   [AnalyticsRecorder]
+  repeat window                  10 minutes   [ListeningAnalytics]
+  "not played recently"          90 days      [ListeningAnalytics]
+  most played rows shown            20        [StatsActivity]
+  rows sampled for aggregation      500        [StatsActivity]
+  artist/album/genre rows shown      5        [StatsActivity]
+  days shown                          14        [StatsActivity]
+  library ids resolved per chunk    400        [StatsActivity]
+
+
+3. THE SCREEN (StatsActivity, main menu -> "Listening stats")
+------------------------------------------------------------
+
+SUMMARY
+
+  Total plays              COUNT(play_start)
+  Total listening time     SUM over play_end of
+                           MIN(position_at_end, duration_seconds) when the
+                           duration is known, otherwise position_at_end.
+                           [PlayEndDao.getTotalListenedSeconds]
+                           Plays that never ended have no play_end row, so
+                           they contribute nothing: paused or abandoned time
+                           is never counted as listening.
+  Finished tracks          fully_played * 100 / end_count (integer division)
+  Skipped tracks           100 - finished, because the two are complements
+  Never played             (distinct library media_store_ids)
+                             - (distinct track_id in play_start)
+                           [SongsDao.getDistinctTracksCount,
+                            PlayStartDao.getDistinctTrackCount]
+
+  Rates are 0% when there is no play_end row yet.
+
+MOST PLAYED TRACKS / ARTISTS / ALBUMS / GENRES
+
+  Query:  SELECT track_id, COUNT(*) GROUP BY track_id
+          ORDER BY play_count DESC LIMIT 500
+  The 500 ids are resolved against the library in chunks of 400 (SQLite's
+  bind-parameter limit is close to that), ids for tracks that no longer
+  exist are dropped, then:
+    tracks    -> first 20, ranked
+    artists   -> grouped in memory by track.artist, sum of play counts,
+                 top 5, blank names skipped
+    albums    -> same, grouped by track.album
+    genres    -> same, grouped by track.genre
+  Aggregation happens in memory rather than in SQL because the playback
+  side records no artist/album/genre keys; joining them to the library is
+  a read of rows we already resolved.
+
+LISTENING BY HOUR / BY DAY OF WEEK
+
+  hour        CAST(strftime('%H', started_at,'unixepoch','localtime') AS INT)
+  day of week CAST(strftime('%w', started_at,'unixepoch','localtime') AS INT)
+              0 = Sunday .. 6 = Saturday
+  Both GROUP BY the bucket, ordered by play count descending, so the
+  busiest hour and the busiest weekday come first. Only buckets with plays
+  are shown.
+
+NOT PLAYED RECENTLY  ("forgotten favorites")
+
+  SELECT track_id, MAX(started_at) FROM play_start
+  WHERE started_at < now - 90 days
+  GROUP BY track_id ORDER BY last_played_at ASC LIMIT 20
+
+  Oldest first. The trailing value on each row is that date. Section is
+  hidden when nothing has ever been played, and shows its empty text when
+  everything played is recent.
+
+LISTENING TIME BY DAY
+
+  bucket   strftime('%Y-%m-%d', started_at,'unixepoch','localtime')
+  value    SUM of position_at_end for the plays started that day
+  Newest day first, last 14 days. Local timezone, so it matches how you
+  think of a listening day.
+
+
+4. OTHER QUERIES IN THE READ LAYER (not shown yet)
+--------------------------------------------------
+
+  getTracksStoppedPartway   tracks with >= 3 ends, ranked by ascending
+                            average position_at_end / duration_seconds,
+                            i.e. the songs you habitually stop early.
+  getRepeatWithinWindowStats  how often a track is played again within
+                            10 minutes of its previous play.
+  getFirstTrackPerDay       MIN(started_at) per day. NOTE: this one buckets
+                            on `started_at / 86400`, i.e. UTC days, unlike
+                            the local-time buckets above.
+  getHourlyStats / getDayOfWeekStats exist in the local-time form only.
+  getPlaylistStats / getPlaylistListeningTimeInPeriod   per playlist_id,
+                            currently only meaningful for the all-tracks
+                            root (see attribution below).
+  getMostPlayedTrackIdsInPeriod / getMostPlayedTrackIdOnDate   period
+                            bucketing for weekly/monthly summaries.
+  hasEverPlayedTrack, getPlayedRecentlyCount, getLastPlayedPerTrack
+                            discovery helpers.
+
+
+5. CAVEATS
+----------
+
+  * Attribution is best-effort. The service knows the last browse root it
+    was asked for, not which playlist you opened a track from, so source is
+    "unknown" for playback started from widgets, notifications, search or a
+    track screen, and playlist_id is 0 in those cases.
+  * duration_seconds stays 0 when the player never reports a duration. Such
+    a play can never be marked fully_played.
+  * Counts survive library changes: play counts keep counting for tracks
+    that were deleted, but the lists drop rows whose track is gone.
+  * Percentages use integer division, so a rate can round down.
+  * Sessions are not recorded at all yet; play_start.session_id is 0.
+  * Data never leaves the device. There is no analytics network call.
+
+If a threshold changes, it changes in one place: `ListeningAnalytics` for
+the storage-side constants and `StatsActivity` for the display limits.
