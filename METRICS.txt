@@ -56,6 +56,7 @@ play_end  [table]
   "not played recently"          90 days      [ListeningAnalytics]
   session gap                     5 minutes   [ListeningAnalytics]
   recent session rows shown         5         [StatsActivity]
+  weekly top rows shown             5         [StatsActivity]
   most played rows shown            20        [StatsActivity]
   rows sampled for aggregation      500        [StatsActivity]
   artist/album/genre rows shown      5        [StatsActivity]
@@ -84,6 +85,38 @@ SUMMARY
                             PlayStartDao.getDistinctTrackCount]
 
   Rates are 0% when there is no play_end row yet.
+
+TOP 5 THIS WEEK / SOUNDTRACK OF THE MONTH
+
+  Both are plain play counts inside a local-time period
+  [PlayStartDao.getMostPlayedTrackIdsInPeriod]:
+
+    SELECT track_id, COUNT(*) AS play_count FROM play_start
+    WHERE started_at >= :since AND started_at < :until
+    GROUP BY track_id ORDER BY play_count DESC LIMIT :limit
+
+  week   local midnight of the locale's first day of week
+         (Calendar.firstDayOfWeek: Sunday in en-US, Monday elsewhere)
+         to the same moment 7 days later
+  month  local midnight of the 1st to the same moment next month
+  [StatsActivity.getWeekBounds / getMonthBounds]
+
+  The section titles carry the period: "Top 5 this week (25 Oct – 31 Oct)"
+  and "Soundtrack of October", with month and day names from
+  DateFormatSymbols in the device locale.
+
+  Weekly rows    top 5 tracks of the week, ranked 1..5, play count on the
+                 right. The rank is only shown for this list.
+  Monthly rows   the single most played track of the month, with its count.
+
+  Titles are resolved against the library like the most played lists, so a
+  play of a track that no longer exists is dropped and can leave the weekly
+  list shorter than 5. Ties on play count have no defined order.
+
+  Periods are computed from "now" every time the screen opens, so the
+  numbers restart on the first day of the week/month rather than
+  accumulating. A section is hidden while its period has no plays yet
+  (e.g. early on the first day of a month).
 
 MOST PLAYED TRACKS / ARTISTS / ALBUMS / GENRES
 
@@ -213,8 +246,9 @@ LISTENING TIME BY DAY
   getPlaylistStats / getPlaylistListeningTimeInPeriod   per playlist_id,
                             currently only meaningful for the all-tracks
                             root (see attribution below).
-  getMostPlayedTrackIdsInPeriod / getMostPlayedTrackIdOnDate   period
-                            bucketing for weekly/monthly summaries.
+  getMostPlayedTrackIdsInPeriod / getMostPlayedTracksInPeriod   backing the
+                            two period summaries above.
+  getMostPlayedTrackIdOnDate   most played track of a single date.
   hasEverPlayedTrack, getPlayedRecentlyCount, getLastPlayedPerTrack
                             discovery helpers.
 

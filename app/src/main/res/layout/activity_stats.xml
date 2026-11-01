@@ -95,6 +95,50 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/stats_weekly_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/stats_weekly_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/most_played_tracks" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_weekly_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/stats_month_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/stats_month_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/most_played_tracks" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_month_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/stats_most_played_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

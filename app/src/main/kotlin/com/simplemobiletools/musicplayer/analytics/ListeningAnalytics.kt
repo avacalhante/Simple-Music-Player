@@ -148,6 +148,10 @@ class ListeningAnalyticsStore(private val context: Context) {
     fun getMostPlayedTrackIdsInPeriod(sinceEpochSeconds: Int, untilEpochSeconds: Int, limit: Int = 50): List<Long> =
         playStartDao.getMostPlayedTrackIdsInPeriod(sinceEpochSeconds, untilEpochSeconds, limit).map { it.trackId }
 
+    /** Like [getMostPlayedTrackIdsInPeriod], keeping each track's play count so a summary can show it. */
+    fun getMostPlayedTracksInPeriod(sinceEpochSeconds: Int, untilEpochSeconds: Int, limit: Int = 50): List<MostPlayedTrack> =
+        playStartDao.getMostPlayedTrackIdsInPeriod(sinceEpochSeconds, untilEpochSeconds, limit)
+
     fun getMostPlayedTrackIdOnDate(dayStartSeconds: Int): Long? =
         playStartDao.getMostPlayedTrackIdsOnDate(dayStartSeconds, dayStartSeconds + 86400).firstOrNull()?.trackId
 

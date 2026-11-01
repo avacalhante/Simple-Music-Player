@@ -113,6 +113,8 @@
     <string name="average_tracks_per_session">Average tracks per session</string>
     <string name="single_song_sessions">Sessions with one song</string>
     <string name="recent_sessions">Recent sessions</string>
+    <string name="weekly_top_5">Top 5 this week (%1$s)</string>
+    <string name="soundtrack_of_month">Soundtrack of %1$s</string>
     <plurals name="play_count">
         <item quantity="one">%d play</item>
         <item quantity="other">%d plays</item>

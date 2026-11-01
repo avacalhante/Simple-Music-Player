@@ -25,6 +25,7 @@ import com.simplemobiletools.musicplayer.extensions.tracksDAO
 import com.simplemobiletools.musicplayer.models.Track
 import java.text.DateFormatSymbols
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -34,6 +35,7 @@ private const val GROUP_LIMIT = 5
 private const val DAYS_LIMIT = 14
 private const val RESOLVE_CHUNK_SIZE = 400
 private const val RECENT_SESSIONS_LIMIT = 5
+private const val WEEKLY_TOP_LIMIT = 5
 private const val MINUTES_PER_DAY = 24 * 60
 
 class StatsActivity : SimpleActivity() {
@@ -41,6 +43,7 @@ class StatsActivity : SimpleActivity() {
     private val binding by viewBinding(ActivityStatsBinding::inflate)
     private val lastPlayedFormat = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
     private val sessionDateFormat = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault())
+    private val dayFormat = SimpleDateFormat("d MMM", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         isMaterialActivity = true
@@ -53,7 +56,7 @@ class StatsActivity : SimpleActivity() {
         arrayOf(
             binding.statsSummaryList, binding.statsMostPlayedList, binding.statsArtistsList, binding.statsAlbumsList,
             binding.statsGenresList, binding.statsWeekdayHoursList, binding.statsWeekdaysList, binding.statsForgottenList, binding.statsDailyList,
-            binding.statsSessionsList, binding.statsRecentSessionsList
+            binding.statsSessionsList, binding.statsRecentSessionsList, binding.statsWeeklyList, binding.statsMonthList
         ).forEach {
             it.layoutManager = LinearLayoutManager(this)
         }
@@ -65,7 +68,7 @@ class StatsActivity : SimpleActivity() {
         arrayOf(
             binding.statsSummaryLabel, binding.statsMostPlayedLabel, binding.statsArtistsLabel, binding.statsAlbumsLabel,
             binding.statsGenresLabel, binding.statsWeekdayHoursLabel, binding.statsWeekdaysLabel, binding.statsForgottenLabel, binding.statsDailyLabel,
-            binding.statsSessionsLabel, binding.statsRecentSessionsLabel
+            binding.statsSessionsLabel, binding.statsRecentSessionsLabel, binding.statsWeeklyLabel, binding.statsMonthLabel
         ).forEach {
             it.setTextColor(getProperPrimaryColor())
         }
@@ -96,6 +99,17 @@ class StatsActivity : SimpleActivity() {
             val weekdayHourRows = analytics.getWeekdaySessionWindows().map { it.toTimeRangeRow() }
             val weekdayRows = analytics.getDayOfWeekStats().map { StatsRow(weekdayName(it.dayOfWeek), it.playCount) }
             val dailyStats: List<DailyStats> = analytics.getDailyStats(DAYS_LIMIT)
+            val weekBounds = getWeekBounds()
+            val monthBounds = getMonthBounds()
+            val weeklyPlays = analytics.getMostPlayedTracksInPeriod(weekBounds.first, weekBounds.second, WEEKLY_TOP_LIMIT)
+            val monthlyTop = analytics.getMostPlayedTracksInPeriod(monthBounds.first, monthBounds.second, 1).firstOrNull()
+            val highlightTracks = resolveTracks(weeklyPlays.map { it.trackId } + listOfNotNull(monthlyTop?.trackId))
+            val weeklyRows = weeklyPlays.mapNotNull { played ->
+                highlightTracks[played.trackId]?.let { played to it }
+            }.mapIndexed { index, (played, track) -> StatsTrackRow(track, playCountText(played.playCount), index + 1) }
+            val monthlyRows = monthlyTop?.let { played ->
+                highlightTracks[played.trackId]?.let { listOf(StatsTrackRow(it, playCountText(played.playCount))) }
+            } ?: emptyList()
             val sessions = analytics.getSessionInfo()
             val sessionRows = buildSessionSummary(sessions)
             val recentSessionRows = sessions.take(RECENT_SESSIONS_LIMIT).map { session ->
@@ -117,6 +131,8 @@ class StatsActivity : SimpleActivity() {
                 binding.statsDailyList.adapter = DailyListeningAdapter(this, dailyStats)
                 binding.statsSessionsList.adapter = StatsValueAdapter(sessionRows)
                 binding.statsRecentSessionsList.adapter = StatsValueAdapter(recentSessionRows)
+                binding.statsWeeklyList.adapter = StatsTrackAdapter(weeklyRows)
+                binding.statsMonthList.adapter = StatsTrackAdapter(monthlyRows)
 
                 binding.statsMostPlayedEmpty.beVisibleIf(playedRows.isEmpty())
                 binding.statsDailyEmpty.beVisibleIf(dailyStats.isEmpty())
@@ -129,6 +145,13 @@ class StatsActivity : SimpleActivity() {
                 binding.statsForgottenSection.beVisibleIf(playedRows.isNotEmpty())
                 binding.statsSessionsSection.beVisibleIf(sessionRows.isNotEmpty())
                 binding.statsRecentSessionsSection.beVisibleIf(recentSessionRows.isNotEmpty())
+                binding.statsWeeklyLabel.text = getString(
+                    R.string.weekly_top_5,
+                    getString(R.string.time_range, dayFormat.format(weekBounds.first * 1000L), dayFormat.format((weekBounds.second - 1) * 1000L))
+                )
+                binding.statsMonthLabel.text = getString(R.string.soundtrack_of_month, monthName(monthBounds.first))
+                binding.statsWeeklySection.beVisibleIf(weeklyRows.isNotEmpty())
+                binding.statsMonthSection.beVisibleIf(monthlyRows.isNotEmpty())
                 binding.statsForgottenEmpty.beVisibleIf(forgottenRows.isEmpty())
 
                 updateTextColors(binding.statsNestedScrollview)
@@ -195,6 +218,41 @@ class StatsActivity : SimpleActivity() {
             .sortedByDescending { it.playCount }
             .take(GROUP_LIMIT)
     }
+
+    /** Local-midnight bounds of the week containing today, starting on the locale's first day of week. */
+    private fun getWeekBounds(): Pair<Int, Int> {
+        val start = Calendar.getInstance()
+        start.set(Calendar.HOUR_OF_DAY, 0)
+        start.set(Calendar.MINUTE, 0)
+        start.set(Calendar.SECOND, 0)
+        start.set(Calendar.MILLISECOND, 0)
+        start.set(Calendar.DAY_OF_WEEK, start.firstDayOfWeek)
+        val end = start.clone() as Calendar
+        end.add(Calendar.WEEK_OF_YEAR, 1)
+        return start.epochSeconds() to end.epochSeconds()
+    }
+
+    /** Local-midnight bounds of the current month. */
+    private fun getMonthBounds(): Pair<Int, Int> {
+        val start = Calendar.getInstance()
+        start.set(Calendar.DAY_OF_MONTH, 1)
+        start.set(Calendar.HOUR_OF_DAY, 0)
+        start.set(Calendar.MINUTE, 0)
+        start.set(Calendar.SECOND, 0)
+        start.set(Calendar.MILLISECOND, 0)
+        val end = start.clone() as Calendar
+        end.add(Calendar.MONTH, 1)
+        return start.epochSeconds() to end.epochSeconds()
+    }
+
+    private fun Calendar.epochSeconds(): Int = (timeInMillis / 1000L).toInt()
+
+    private fun monthName(epochSeconds: Int): String {
+        val calendar = Calendar.getInstance().apply { timeInMillis = epochSeconds * 1000L }
+        return DateFormatSymbols.getInstance().months[calendar.get(Calendar.MONTH)]
+    }
+
+    private fun playCountText(playCount: Int): String = resources.getQuantityString(R.plurals.play_count, playCount, playCount)
 
     /** "Saturday" + "12:00 – 14:00", the mean session start and the mean session end of that weekday. */
     private fun WeekdaySessionWindow.toTimeRangeRow(): StatsValueRow {
