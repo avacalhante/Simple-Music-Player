@@ -11,6 +11,7 @@ import com.simplemobiletools.musicplayer.inlines.indexOfFirstOrNull
 import kotlinx.coroutines.*
 
 private const val DEFAULT_SHUFFLE_ORDER_SEED = 42L
+private const val SEEK_COALESCE_DELAY_MS = 300L
 
 @UnstableApi
 class SimpleMusicPlayer(private val exoPlayer: ExoPlayer) : ForwardingPlayer(exoPlayer) {
@@ -131,23 +132,28 @@ class SimpleMusicPlayer(private val exoPlayer: ExoPlayer) : ForwardingPlayer(exo
     }
 
     /**
-     * This is here so the player can quickly seek next/previous without doing too much work.
-     * It probably won't be needed once https://github.com/androidx/media/issues/81 is resolved.
+     * Seeks immediately on the first tap, then coalesces the taps that arrive while the window is open
+     * into one final seek. This is here so the player can quickly seek next/previous without doing too
+     * much work, which it probably won't need once https://github.com/androidx/media/issues/81 is
+     * resolved. A pure trailing edge delay, as it was before, added its full length to every single
+     * skip instead of only to the extra ones.
      */
     private fun seekWithDelay() {
+        if (seekJob?.isActive != true) {
+            seekByCount()
+        }
+
         seekJob?.cancel()
         seekJob = scope.launch {
-            delay(timeMillis = 300)
-            val seekCount = seekToNextCount - seekToPreviousCount
-            if (seekCount != 0) {
-                seekByCount(seekCount)
-            }
+            delay(timeMillis = SEEK_COALESCE_DELAY_MS)
+            seekByCount()
         }
     }
 
-    private fun seekByCount(seekCount: Int) {
+    private fun seekByCount() {
         runOnPlayerThread {
-            if (currentMediaItem == null) {
+            val seekCount = seekToNextCount - seekToPreviousCount
+            if (seekCount == 0 || currentMediaItem == null) {
                 return@runOnPlayerThread
             }
 
