@@ -20,6 +20,10 @@ import com.simplemobiletools.musicplayer.extensions.*
 class CurrentTrackBar(context: Context, attributeSet: AttributeSet) : RelativeLayout(context, attributeSet) {
     private val binding by viewBinding(ViewCurrentTrackBarBinding::bind)
 
+    // Cover art loads asynchronously, so a load started for an earlier track can finish after the
+    // current one and briefly show the wrong cover. Each request gets an id and stale results are dropped.
+    private var artworkRequestId = 0
+
     fun initialize(togglePlayback: () -> Unit) {
         binding.currentTrackPlayPause.setOnClickListener {
             togglePlayback()
@@ -34,6 +38,7 @@ class CurrentTrackBar(context: Context, attributeSet: AttributeSet) : RelativeLa
     fun updateCurrentTrack(mediaItem: MediaItem?) {
         val track = mediaItem?.toTrack()
         if (track == null) {
+            artworkRequestId++
             fadeOut()
             return
         } else {
@@ -54,12 +59,15 @@ class CurrentTrackBar(context: Context, attributeSet: AttributeSet) : RelativeLa
             .error(currentTrackPlaceholder)
             .transform(CenterCrop(), RoundedCorners(cornerRadius))
 
+        val requestId = ++artworkRequestId
         context.getTrackCoverArt(track) { coverArt ->
             (context as? Activity)?.ensureActivityNotDestroyed {
-                Glide.with(this)
-                    .load(coverArt)
-                    .apply(options)
-                    .into(findViewById(R.id.current_track_image))
+                if (requestId == artworkRequestId) {
+                    Glide.with(this)
+                        .load(coverArt)
+                        .apply(options)
+                        .into(findViewById(R.id.current_track_image))
+                }
             }
         }
     }

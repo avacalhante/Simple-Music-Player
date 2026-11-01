@@ -43,6 +43,11 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
     private var isThirdPartyIntent = false
     private lateinit var nextTrackPlaceholder: Drawable
 
+    // Cover art loads asynchronously, so a load started for an earlier track can finish after the
+    // current one and briefly show the wrong cover. Each request gets an id and stale results are dropped.
+    private var topArtworkRequestId = 0
+    private var nextArtworkRequestId = 0
+
     private val handler = Handler(Looper.getMainLooper())
     private val updateIntervalMillis = 500L
 
@@ -173,6 +178,7 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
     private fun setupNextTrackInfo(item: MediaItem?) {
         val track = item?.toTrack()
         if (track == null) {
+            nextArtworkRequestId++
             binding.nextTrackHolder.beGone()
             return
         }
@@ -187,6 +193,7 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
         @SuppressLint("SetTextI18n")
         binding.nextTrackLabel.text = "${getString(R.string.next_track)} ${track.title}$artist"
 
+        val requestId = ++nextArtworkRequestId
         getTrackCoverArt(track) { coverArt ->
             val cornerRadius = resources.getDimension(com.simplemobiletools.commons.R.dimen.rounded_corner_radius_small).toInt()
             val wantedSize = resources.getDimension(R.dimen.song_image_size).toInt()
@@ -197,13 +204,17 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
                 options = RequestOptions().transform(CenterCrop(), RoundedCorners(cornerRadius)),
                 size = Size(wantedSize, wantedSize),
                 onLoadFailed = {
-                    runOnUiThread {
-                        binding.nextTrackImage.setImageDrawable(nextTrackPlaceholder)
+                    if (requestId == nextArtworkRequestId) {
+                        runOnUiThread {
+                            binding.nextTrackImage.setImageDrawable(nextTrackPlaceholder)
+                        }
                     }
                 },
-                onResourceReady = {
-                    runOnUiThread {
-                        binding.nextTrackImage.setImageDrawable(it)
+                onResourceReady = { drawable ->
+                    if (requestId == nextArtworkRequestId) {
+                        runOnUiThread {
+                            binding.nextTrackImage.setImageDrawable(drawable)
+                        }
                     }
                 }
             )
@@ -211,6 +222,7 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
     }
 
     private fun setupTopArt(track: Track) {
+        val requestId = ++topArtworkRequestId
         getTrackCoverArt(track) { coverArt ->
             var wantedHeight = resources.getCoverArtHeight()
             wantedHeight = min(wantedHeight, realScreenSize.y / 2)
@@ -222,22 +234,26 @@ class TrackActivity : SimpleControllerActivity(), PlaybackSpeedListener {
                 options = RequestOptions().centerCrop(),
                 size = Size(wantedWidth, wantedHeight),
                 onLoadFailed = {
-                    val drawable = resources.getDrawable(R.drawable.ic_headset)
-                    val placeholder = getResizedDrawable(drawable, wantedHeight)
-                    placeholder.applyColorFilter(getProperTextColor())
+                    if (requestId == topArtworkRequestId) {
+                        val drawable = resources.getDrawable(R.drawable.ic_headset)
+                        val placeholder = getResizedDrawable(drawable, wantedHeight)
+                        placeholder.applyColorFilter(getProperTextColor())
 
-                    runOnUiThread {
-                        binding.activityTrackImage.setImageDrawable(placeholder)
+                        runOnUiThread {
+                            binding.activityTrackImage.setImageDrawable(placeholder)
+                        }
                     }
                 },
-                onResourceReady = {
-                    val coverHeight = it.intrinsicHeight
-                    if (coverHeight > 0 && binding.activityTrackImage.height != coverHeight) {
-                        binding.activityTrackImage.layoutParams.height = coverHeight
-                    }
+                onResourceReady = { drawable ->
+                    if (requestId == topArtworkRequestId) {
+                        val coverHeight = drawable.intrinsicHeight
+                        if (coverHeight > 0 && binding.activityTrackImage.height != coverHeight) {
+                            binding.activityTrackImage.layoutParams.height = coverHeight
+                        }
 
-                    runOnUiThread {
-                        binding.activityTrackImage.setImageDrawable(it)
+                        runOnUiThread {
+                            binding.activityTrackImage.setImageDrawable(drawable)
+                        }
                     }
                 }
             )
