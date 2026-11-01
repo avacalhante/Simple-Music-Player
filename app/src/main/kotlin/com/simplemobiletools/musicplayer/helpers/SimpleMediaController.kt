@@ -23,7 +23,7 @@ class SimpleMediaController(val context: Application) {
     private var controller: MediaController? = null
 
     @Synchronized
-    fun createControllerAsync() {
+    fun createControllerAsync(): ListenableFuture<MediaController> {
         controllerFuture = MediaController
             .Builder(context, SessionToken(context, ComponentName(context, PlaybackService::class.java)))
             .setApplicationLooper(Looper.getMainLooper())
@@ -32,6 +32,7 @@ class SimpleMediaController(val context: Application) {
         controllerFuture.addListener({
             controller = getControllerSync()
         }, MoreExecutors.directExecutor())
+        return controllerFuture
     }
 
     private fun getControllerSync() = controllerFuture.getOrNull()
@@ -48,11 +49,14 @@ class SimpleMediaController(val context: Application) {
         executorService.execute {
             if (shouldCreateNewController()) {
                 createControllerAsync()
-            } else {
-                controller = getControllerSync()
             }
 
-            callback?.invoke()
+            // The controller is created asynchronously. Wait for the future, otherwise the callback runs while
+            // getControllerSync() still returns null and the command is silently dropped.
+            controllerFuture.addListener({
+                controller = getControllerSync()
+                callback?.invoke()
+            }, executorService)
         }
     }
 

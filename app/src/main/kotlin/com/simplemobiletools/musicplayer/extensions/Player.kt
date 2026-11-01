@@ -173,6 +173,10 @@ inline fun Player.maybePreparePlayer(context: Context, crossinline callback: (su
             context.audioHelper.getQueuedTracksLazily { tracks, startIndex, startPositionMs ->
                 if (!prepared) {
                     prepareUsingTracks(tracks = tracks, startIndex = startIndex, startPositionMs = startPositionMs) {
+                        // Allow another attempt when there were no queued tracks, for example before the first scan.
+                        if (!it) {
+                            prepareInProgress = false
+                        }
                         callback(it)
                         prepared = it
                     }

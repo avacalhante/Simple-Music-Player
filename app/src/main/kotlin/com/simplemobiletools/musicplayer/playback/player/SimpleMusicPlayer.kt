@@ -89,10 +89,6 @@ class SimpleMusicPlayer(private val exoPlayer: ExoPlayer) : ForwardingPlayer(exo
         }
     }
 
-    fun getAudioSessionId(): Int {
-        return exoPlayer.audioSessionId
-    }
-
     fun setSkipSilence(skipSilence: Boolean) {
         exoPlayer.skipSilenceEnabled = skipSilence
     }

@@ -39,16 +39,18 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
     }
 
     override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
-        val connectionResult = super.onConnect(session, controller)
-        val availableSessionCommands = connectionResult.availableSessionCommands.buildUpon()
+        // Don't use super.onConnect() here: on Media3 1.11 it returns empty command sets and relies on a bundle
+        // flag to fall back to the default commands. Rebuilding that result drops the flag, which leaves the
+        // controller unable to call play(), pause() or change the queue.
+        val builder = MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+        val availableSessionCommands = builder.build().availableSessionCommands.buildUpon()
         for (command in customCommands) {
             availableSessionCommands.add(command)
         }
 
-        return MediaSession.ConnectionResult.accept(
-            availableSessionCommands.build(),
-            connectionResult.availablePlayerCommands
-        )
+        return builder
+            .setAvailableSessionCommands(availableSessionCommands.build())
+            .build()
     }
 
     override fun onPostConnect(session: MediaSession, controller: MediaSession.ControllerInfo) {
