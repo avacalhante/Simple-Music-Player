@@ -122,6 +122,12 @@ Do **not** couple this phase with UI changes. The notification/lock-screen prese
 - Changing distribution away from F-Droid.
 - Rewriting playback on a new architecture; keep Media3.
 
+## Follow-ups found during device testing
+
+- Skipping a track used to wait out the full 300 ms seek coalescing window before the player started preparing the next item, so even a single skip felt delayed. The first tap now seeks immediately; only taps that arrive inside the window are coalesced into one final seek. Measured through the media session: item transition ~390 ms → ~90 ms, playback ~640–970 ms → ~370–500 ms, and 1/5/8 rapid skips still advance the queue by exactly 1/5/8.
+- The album art flicker while skipping came from stale background loads: a cover requested for an earlier track could finish after the newer one and be applied on top of it. Artwork callbacks are now ignored unless they belong to the newest request (full player and mini player).
+- A/B testing Media3 1.1.1 against 1.11.1 with identical measurement showed no playback-engine regression, which is why the fix is in the app's seek and artwork handling rather than in the dependency.
+
 ## Suggested order
 
 1. Phase 1 (indices) — one migration, immediate read speedup.
