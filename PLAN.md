@@ -2,14 +2,14 @@
 
 This is a working plan, not a promise of scope. Update the checkboxes as work lands.
 
-Last updated: 2026-10-30
+Last updated: 2026-10-31
 
 ## Constraints (agreed with the owner)
 
 - **UI/appearance is frozen.** No Material 3, dynamic color, or redesign. Only minor functional tweaks that don't change the look.
 - **targetSdk stays as-is.** The app is not published (F-Droid build is used locally) and the target device runs Android 13 (SDK 33). Google Play's API 36 requirement does not apply.
 - **`fdroid` is the release flavor.** Release builds are extremely heavy on this machine; iterate with `:app:compileFdroidDebugKotlin` and only run release builds when explicitly asked.
-- Use JDK 17/21 (`JAVA_HOME=/usr/lib/jvm/java-21-openjdk`), not the machine's default JDK 27.
+- Use JDK 17 (`JAVA_HOME=/home/v/.jdks/jbr-17.0.14` on this machine) or a JDK 21 that ships `javac`, not the machine's default JDK 27.
 
 ## Findings (evidence)
 
@@ -93,15 +93,21 @@ Acceptance: no behaviour change; sort results identical. Verified by comparing t
 
 ## Phase 5 — Dependency/toolchain refresh (separate branch, no UI changes)
 
+Status: done on `feat/toolchain-refresh`, verified on the Android 13 device after every step.
+
 Do these one at a time, each with a device smoke test, because they can affect playback and notifications:
 
-- [ ] Media3 `1.1.1` → current `1.10.x`. This brings years of session and notification fixes plus player/format improvements. The shuffle-order workarounds in `SimpleMusicPlayer.kt` must stay: upstream issue #325 (shuffle order in the Player interface) is still open as of 2026.
-- [ ] Kotlin/KSP `1.9.10` → 2.x (keep KSP version paired).
-- [ ] AGP/Gradle upgrade (JDK 21 is available). Expect manifest/DSL cleanups.
-- [ ] Enable Gradle configuration cache / build cache if the plugins cooperate; measure F-Droid build time before and after.
-- [ ] Keep Jetifier until Simple-Commons is replaced or updated; it exists for third-party dependencies such as the pinned 2023 Commons build, so removing it blindly will break the build.
+- [x] Gradle `8.2.1` → `8.14.3`, AGP `8.1.1` → `8.13.2`, `compileSdk` `34` → `36`. targetSdk stays at 34 and the Java/Kotlin targets stay at 17.
+- [x] Kotlin `1.9.10` → `2.2.21`, KSP → `2.2.21-2.0.5` (KSP2) and Room `2.5.2` → `2.8.5`. Kotlin 2.2 only pairs with KSP2 and Room only supports KSP2 from 2.7, so these move together. Room 2.8 rejects nullable element types in `@Delete` parameters, and `kotlinOptions` was replaced by the `compilerOptions` DSL.
+- [x] Media3 `1.1.1` → `1.11.1`. `buildAudioSink` lost its offload flag and `setOffloadMode` (offload was already disabled), and `ForwardingPlayer` now exposes `getAudioSessionId`, so the local helper was removed. The shuffle-order workarounds in `SimpleMusicPlayer.kt` stay: upstream issue #325 is still open.
+- [x] Enable Gradle configuration and build caches. A clean F-Droid debug build takes 34 s without them, 53 s while the cache is cold and 14 s once warm; a one-line Kotlin change rebuilds in 7 s. The "incompatible with Gradle 9" warning from KSP1 is gone.
+- [x] Keep Jetifier. It is still enabled for the pinned 2023 Commons build and its third-party dependencies.
 
-Do **not** couple this phase with UI changes. The notification/lock-screen presentation comes from Media3, so check it explicitly.
+Notes from the Media3 jump:
+- `MediaSession.Callback.onConnect` must not rebuild the result of `super.onConnect()` on 1.11: it returns empty command sets plus a marker telling the session to use the defaults, and rebuilding drops the marker. Without the fix, controllers could not play, pause or change the queue.
+- `MediaController` is created asynchronously; commands are now queued until the future completes instead of being silently dropped when the callback ran before the controller was ready. `prepareInProgress` is reset when there is no queue, so a later `onResume` can retry.
+
+Do **not** couple this phase with UI changes. The notification/lock-screen presentation comes from Media3, so check it explicitly. Verified after the update: library and tabs, cold-start playback, play/pause, next/previous, shuffle on/off, seek, queue and position restore across process death, notification with four actions, and the equalizer (audio session id).
 
 ## Phase 6 — Optional functional gaps (owner decision needed)
 

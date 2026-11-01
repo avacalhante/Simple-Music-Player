@@ -1,6 +1,14 @@
 Changelog
 ==========
 
+Version 5.18.4 *(2026-10-31)*
+----------------------------
+
+ * Faster startup, media browsing and playback on large libraries
+ * The playback queue is only saved when it actually changes
+ * "Date added" sorting survives file moves and renames
+ * Updated the playback engine, database library and build toolchain
+
 Version 5.18.3 *(2023-10-17)*
 ----------------------------
 

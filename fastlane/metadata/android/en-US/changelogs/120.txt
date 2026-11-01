@@ -1,0 +1,4 @@
+ * Faster startup, media browsing and playback on large libraries
+ * The playback queue is only saved when it actually changes
+ * "Date added" sorting survives file moves and renames
+ * Updated the playback engine, database library and build toolchain
