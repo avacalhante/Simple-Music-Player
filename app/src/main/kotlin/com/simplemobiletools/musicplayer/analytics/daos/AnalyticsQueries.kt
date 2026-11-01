@@ -73,6 +73,15 @@ data class TrackListeningTime(
     @ColumnInfo(name = "end_count") val endCount: Int
 )
 
+/**
+ * The newest open session and the epoch seconds of its last listening activity,
+ * which is either the end of its last play or the start of a play that never ended.
+ */
+data class OpenSessionState(
+    @ColumnInfo(name = "id") val id: Long,
+    @ColumnInfo(name = "last_activity_at") val lastActivityAt: Int
+)
+
 data class SessionInfo(
     @ColumnInfo(name = "id") val id: Long,
     @ColumnInfo(name = "started_at") val startedAt: Int,

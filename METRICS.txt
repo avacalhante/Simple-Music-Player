@@ -183,17 +183,44 @@ NOT PLAYED RECENTLY  ("forgotten favorites")
 
 LISTENING SESSIONS / RECENT SESSIONS
 
-  A session is a stretch of continuous listening. `AnalyticsRecorder.onTrackStart`
-  keeps one open session in memory:
+  A session is a stretch of continuous listening. There is no in-memory session
+  state: every play start asks the store for the open session
+  [ListeningAnalyticsStore.resumeOpenSession], which is the single writer of
+  listening_sessions, so a process death or an app restart cannot disagree with
+  it.
 
-    * no current session      -> open a new one at this play's started_at
-    * gap since the previous   -> close the current one and open a new one
-      play > 5 minutes
-    * otherwise               -> the play joins the current session
+    * an open session whose last activity is within 5 minutes -> the play joins it
+    * an open session whose last activity is older            -> it is closed at
+      that last activity, and a new session is opened at this play's started_at
 
-  Closing sets listening_sessions.ended_at (a closed-marker only). Any session
-  left open by a process death is closed when the next play starts, and
-  `AnalyticsPlaybackBridge.close` (service shutdown) closes the current one.
+  "Last activity" is a persisted fact, not a timestamp kept in memory:
+
+    COALESCE(play_end.ended_at,                       -- the play ended
+             play_start.started_at + duration,        -- it never ended, but its
+                                                         duration is known
+             play_start.started_at,                   -- neither is known
+             session.started_at)                      -- no plays at all
+    maximized over the session's plays
+  [ListeningSessionDao.getOpenSessionState]
+
+  So every play start restarts the 5 minute window, and so does every play end:
+  a 9 minute track followed by a 3 minute pause resumes the session, while the
+  same track followed by a 6 minute pause starts a new one.
+
+  Nothing closes a session eagerly. Playback stopping (service shutdown) and the
+  app being killed only end the current play. The session stays open until the
+  window has passed, which is why closing the app and reopening it a minute
+  later continues the same session instead of adding a near-empty one.
+
+  A stale session is closed at the two points where it can be noticed:
+
+    * the next play start, via resumeOpenSession (see above)
+    * a stats screen load, via ListeningAnalyticsStore.closeStaleSessions, so
+      the last session of the day is shown without waiting for more playback
+
+  Closing sets listening_sessions.ended_at (a closed-marker only) to that last
+  activity, not to "now", so a late sweep cannot lengthen a session. The close
+  is idempotent (`WHERE ended_at = 0`), so two closers can never move it.
 
   Session length is NOT taken from ended_at - started_at, because that would
   count idle time between the last track and the moment the session was
@@ -267,10 +294,14 @@ LISTENING TIME BY DAY
   * Percentages use integer division, so a rate can round down.
   * Sessions only split on a gap between two different plays. Pausing one
     track for longer than the gap and resuming it does not end the session,
-    because no new play_start row is written. Sessions from before this
+    because no new play_start row is written and resuming is not an event the
+    analytics layer sees. Sessions from before this
     feature have session_id 0 and are not counted.
-  * A session interrupted by a crash stays open until the next play closes
-    it, so it is not shown until then.
+  * A session interrupted by a crash stays open until the 5 minute window has
+    passed, so it is not shown until then - up to a 5 minute delay after
+    playback stops, and longer if nothing happens to notice it.
+  * A session's close marker is written once. A row closed by an older build
+    that had already overwritten it keeps its shortened length.
   * Data never leaves the device. There is no analytics network call.
 
 If a threshold changes, it changes in one place: `ListeningAnalytics` for

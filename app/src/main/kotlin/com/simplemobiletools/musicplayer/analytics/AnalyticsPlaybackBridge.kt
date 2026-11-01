@@ -32,11 +32,12 @@ class AnalyticsPlaybackBridge(service: PlaybackService) {
         post { recorder.onPositionChanged(positionMs, durationMs) }
     }
 
+    /**
+     * Records the end of the current play. The session is left open: it is closed once the session gap has
+     * passed, so reopening the app right after the service goes away continues the same session.
+     */
     fun close(positionMs: Long? = null, durationMs: Long? = null) {
-        post {
-            recorder.onTrackEnd(positionMs, durationMs)
-            recorder.onPlaybackStopped()
-        }
+        post { recorder.onTrackEnd(positionMs, durationMs) }
     }
 
     private fun post(action: () -> Unit) {

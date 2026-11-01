@@ -11,10 +11,34 @@ interface ListeningSessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(session: ListeningSession): Long
 
-    @Query("SELECT * FROM listening_sessions WHERE ended_at = 0 ORDER BY started_at DESC LIMIT 1")
-    fun getOpenSession(): ListeningSession?
+    /**
+     * The newest open session with its last listening activity, used to continue a session across a process
+     * death or an app restart while the session gap window is still alive.
+     * A play that ended contributes its end time, a play that never ended its start plus its known duration,
+     * and a session without plays its own start.
+     */
+    @Query("""
+        SELECT s.id AS id,
+               MAX(
+                   COALESCE(
+                       e.ended_at,
+                       p.started_at + CASE WHEN p.duration_seconds > 0 THEN p.duration_seconds ELSE 0 END,
+                       p.started_at,
+                       s.started_at
+                   )
+               ) AS last_activity_at
+        FROM listening_sessions AS s
+        LEFT JOIN play_start AS p ON p.session_id = s.id
+        LEFT JOIN play_end AS e ON e.play_start_id = p.id
+        WHERE s.ended_at = 0
+        GROUP BY s.id
+        ORDER BY s.started_at DESC
+        LIMIT 1
+    """)
+    fun getOpenSessionState(): OpenSessionState?
 
-    @Query("UPDATE listening_sessions SET ended_at = :endedAt WHERE id = :id")
+    /** Sets the close marker once; a second close of the same session must not move it. */
+    @Query("UPDATE listening_sessions SET ended_at = :endedAt WHERE id = :id AND ended_at = 0")
     fun closeSession(id: Long, endedAt: Int)
 
     @Query("SELECT COUNT(*) FROM listening_sessions WHERE ended_at > 0")

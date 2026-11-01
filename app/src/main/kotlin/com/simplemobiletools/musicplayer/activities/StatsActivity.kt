@@ -110,6 +110,8 @@ class StatsActivity : SimpleActivity() {
             val monthlyRows = monthlyTop?.let { played ->
                 highlightTracks[played.trackId]?.let { listOf(StatsTrackRow(it, playCountText(played.playCount))) }
             } ?: emptyList()
+            // a session left open by the last playback is only finished once its gap window has passed
+            analytics.closeStaleSessions()
             val sessions = analytics.getSessionInfo()
             val sessionRows = buildSessionSummary(sessions)
             val recentSessionRows = sessions.take(RECENT_SESSIONS_LIMIT).map { session ->

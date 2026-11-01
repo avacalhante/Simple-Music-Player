@@ -92,7 +92,28 @@ class ListeningAnalyticsStore(private val context: Context) {
         }
     }
 
-    fun getOpenSession(): ListeningSession? = sessionDao.getOpenSession()
+    /**
+     * Closes an open session whose last listening activity is older than the session gap, so the stats screen can
+     * show it. Its close marker is that last activity, so a late sweep does not lengthen the session.
+     */
+    fun closeStaleSessions() = closeStaleSessions(nowSeconds())
+
+    fun closeStaleSessions(nowSec: Int) {
+        val open = sessionDao.getOpenSessionState() ?: return
+        if (nowSec - open.lastActivityAt > ListeningAnalytics.SESSION_GAP_SECONDS) {
+            sessionDao.closeSession(open.id, open.lastActivityAt)
+        }
+    }
+
+    /**
+     * The open session to continue, or null when there is none or its window has elapsed.
+     * A session stays open across an app restart or a short stop, so a listening stretch is not
+     * split into several sessions by a small gap.
+     */
+    fun resumeOpenSession(nowSec: Int): Long? {
+        closeStaleSessions(nowSec)
+        return sessionDao.getOpenSessionState()?.id
+    }
 
     fun getClosedSessionCount(): Int = sessionDao.getClosedSessionCount()
 

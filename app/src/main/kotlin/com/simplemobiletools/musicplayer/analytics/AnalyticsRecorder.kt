@@ -15,8 +15,6 @@ class AnalyticsRecorder(context: Context) {
     private var lastKnownPositionMs: Long = 0L
     private var lastKnownDurationMs: Long = 0L
     private var persistedDurationSeconds: Int = 0
-    private var currentSessionId: Long = 0L
-    private var lastTrackStartedAtSec: Int = 0
 
     fun onTrackStart(
         mediaItem: MediaItem,
@@ -48,33 +46,14 @@ class AnalyticsRecorder(context: Context) {
     }
 
     /**
-     * Returns the session the play belongs to, opening a new one when the previous play is older than
-     * the session gap. Closing a session only marks it as finished; its length comes from its plays.
+     * Returns the session the play belongs to, opening a new one when the last listening activity is older than
+     * the session gap. The store owns that state, so the gap is measured from what is actually persisted: the end
+     * of the last play, or the start plus the known duration of a play that never ended. Every play therefore
+     * restarts the window, and a session left open by an app restart or a short stop is continued instead of
+     * being split in two. Closing a session only marks it as finished; its length comes from its plays.
      */
     private fun ensureSession(nowSec: Int): Long {
-        if (currentSessionId > 0L) {
-            if (nowSec - lastTrackStartedAtSec > ListeningAnalytics.SESSION_GAP_SECONDS) {
-                analytics.closeSession(currentSessionId, nowSec)
-                currentSessionId = 0L
-            }
-        } else {
-            // a session can still be open after a process death, close it before starting a new one
-            analytics.getOpenSession()?.let { analytics.closeSession(it.id, nowSec) }
-        }
-
-        if (currentSessionId <= 0L) {
-            currentSessionId = analytics.openSession(nowSec)
-        }
-        lastTrackStartedAtSec = nowSec
-        return currentSessionId
-    }
-
-    /** Marks the current session as finished. Called when playback goes away, so the stats screen does not keep it open. */
-    fun onPlaybackStopped() {
-        if (currentSessionId > 0L) {
-            analytics.closeSession(currentSessionId, nowSeconds())
-            currentSessionId = 0L
-        }
+        return analytics.resumeOpenSession(nowSec) ?: analytics.openSession(nowSec)
     }
 
     fun onPositionChanged(positionMs: Long, durationMs: Long) {
