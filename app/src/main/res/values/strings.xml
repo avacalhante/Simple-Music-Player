@@ -50,6 +50,11 @@
     <string name="export_playlist">Export playlist</string>
     <string name="import_playlist">Import playlist</string>
     <string name="filename_without_m3u">Filename (without .m3u)</string>
+    <string name="export_playlists">Export playlists</string>
+    <plurals name="playlists_exported">
+        <item quantity="one">%d playlist exported</item>
+        <item quantity="other">%d playlists exported</item>
+    </plurals>
     <!-- Sorting -->
     <string name="track_count">Track Count</string>
     <string name="album_count">Album Count</string>
@@ -114,6 +119,17 @@
     <string name="recent_sessions">Recent sessions</string>
     <string name="weekly_top_5">Top 5 this week (%1$s)</string>
     <string name="soundtrack_of_month">Soundtrack of %1$s</string>
+    <string name="export_stats">Export stats</string>
+    <string name="import_stats">Import stats</string>
+    <string name="clear_stats">Clear stats</string>
+    <string name="stats_exported">Listening stats exported</string>
+    <string name="stats_export_failed">Could not export the stats</string>
+    <string name="stats_imported">Listening stats imported</string>
+    <string name="stats_import_failed">Could not import the stats</string>
+    <string name="stats_cleared">Listening stats deleted</string>
+    <string name="invalid_stats_file">This file is not a listening stats export</string>
+    <string name="import_stats_warning">Importing will replace all currently tracked listening stats. This cannot be undone.</string>
+    <string name="clear_stats_warning">Delete all tracked listening stats? This cannot be undone.</string>
     <plurals name="play_count">
         <item quantity="one">%d play</item>
         <item quantity="other">%d plays</item>

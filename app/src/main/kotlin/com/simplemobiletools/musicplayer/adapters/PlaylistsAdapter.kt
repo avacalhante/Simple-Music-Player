@@ -15,6 +15,7 @@ import com.simplemobiletools.musicplayer.dialogs.NewPlaylistDialog
 import com.simplemobiletools.musicplayer.dialogs.RemovePlaylistDialog
 import com.simplemobiletools.musicplayer.extensions.audioHelper
 import com.simplemobiletools.musicplayer.extensions.config
+import com.simplemobiletools.musicplayer.extensions.exportPlaylists
 import com.simplemobiletools.musicplayer.inlines.indexOfFirstOrNull
 import com.simplemobiletools.musicplayer.models.Events
 import com.simplemobiletools.musicplayer.models.Playlist
@@ -49,6 +50,7 @@ class PlaylistsAdapter(
         when (id) {
             R.id.cab_delete -> askConfirmDelete()
             R.id.cab_rename -> showRenameDialog()
+            R.id.cab_export -> exportSelectedPlaylists()
             R.id.cab_select_all -> selectAll()
         }
     }
@@ -84,6 +86,10 @@ class PlaylistsAdapter(
 
             EventBus.getDefault().post(Events.PlaylistsUpdated())
         }
+    }
+
+    private fun exportSelectedPlaylists() {
+        context.exportPlaylists(getSelectedItems())
     }
 
     private fun showRenameDialog() {

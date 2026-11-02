@@ -11,6 +11,9 @@ interface PlayStartDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(start: PlayStart): Long
 
+    @Query("DELETE FROM play_start")
+    fun deleteAll()
+
     @Query("SELECT * FROM play_start ORDER BY started_at DESC")
     fun getAll(): List<PlayStart>
 

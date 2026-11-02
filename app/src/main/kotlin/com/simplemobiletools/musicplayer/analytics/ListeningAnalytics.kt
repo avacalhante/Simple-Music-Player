@@ -16,7 +16,6 @@ import com.simplemobiletools.musicplayer.analytics.daos.PlaylistListeningTime
 import com.simplemobiletools.musicplayer.analytics.daos.TrackListeningTime
 import com.simplemobiletools.musicplayer.analytics.daos.WeekdaySessionWindow
 import com.simplemobiletools.musicplayer.analytics.entities.ListeningSession
-import com.simplemobiletools.musicplayer.analytics.entities.PlayEnd
 import com.simplemobiletools.musicplayer.analytics.entities.PlayStart
 
 object ListeningAnalytics {
@@ -79,15 +78,13 @@ class ListeningAnalyticsStore(private val context: Context) {
         skipped: Boolean,
         quickSkip: Boolean
     ) {
-        playEndDao.insert(
-            PlayEnd(
-                playStartId = playStartId,
-                endedAt = endedAt,
-                positionAtEnd = positionAtEnd,
-                fullyPlayed = if (fullyPlayed) 1 else 0,
-                skipped = if (skipped) 1 else 0,
-                quickSkip = if (quickSkip) 1 else 0
-            )
+        playEndDao.insertForExistingPlay(
+            playStartId = playStartId,
+            endedAt = endedAt,
+            positionAtEnd = positionAtEnd,
+            fullyPlayed = if (fullyPlayed) 1 else 0,
+            skipped = if (skipped) 1 else 0,
+            quickSkip = if (quickSkip) 1 else 0
         )
     }
 
@@ -221,6 +218,40 @@ class ListeningAnalyticsStore(private val context: Context) {
     fun isPlayedRecently(trackId: Long): Boolean {
         val cutoff = nowSeconds() - ListeningAnalytics.NOT_PLAYED_RECENTLY_DAYS * 86400L
         return playStartDao.getPlayedRecentlyCount(trackId, cutoff.toInt()) > 0
+    }
+
+    // ---- backup / restore ----
+
+    /** Everything the stats screen reads, with the ids that tie the tables together. */
+    fun exportBackup(): AnalyticsBackup = AnalyticsBackup(
+        version = AnalyticsBackup.VERSION,
+        exportedAt = nowSeconds(),
+        playStarts = playStartDao.getAll(),
+        playEnds = playEndDao.getAll(),
+        sessions = sessionDao.getAll()
+    )
+
+    /**
+     * Replaces the whole history with [backup], keeping its ids so the plays keep pointing at their session and
+     * their end. The autoincrement counters continue after the imported ids.
+     */
+    fun importBackup(backup: AnalyticsBackup) {
+        db.runInTransaction {
+            deleteAllTables()
+            backup.sessions.orEmpty().forEach { sessionDao.insert(it) }
+            backup.playStarts.orEmpty().forEach { playStartDao.insert(it) }
+            backup.playEnds.orEmpty().forEach { playEndDao.insert(it) }
+        }
+    }
+
+    fun clearAllData() {
+        db.runInTransaction { deleteAllTables() }
+    }
+
+    private fun deleteAllTables() {
+        playStartDao.deleteAll()
+        playEndDao.deleteAll()
+        sessionDao.deleteAll()
     }
 
     // ---- helpers ----

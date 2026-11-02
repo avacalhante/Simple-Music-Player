@@ -319,7 +319,29 @@ LISTENING TIME BY DAY
     playback stops, and longer if nothing happens to notice it.
   * A session's close marker is written once. A row closed by an older build
     that had already overwritten it keeps its shortened length.
-  * Data never leaves the device. There is no analytics network call.
+  * Data never leaves the device. There is no analytics network call; the
+    only way data leaves the app is the user-initiated export below.
+
+
+6. BACKUP, RESTORE AND CLEARING
+-------------------------------
+
+  Export stats (stats screen overflow menu) writes the three tables, with
+  their ids, into one json file through the system file picker [AnalyticsBackup].
+  The file carries a version marker that the importer checks.
+
+  Import stats REPLACES the whole history with the file's content, it does not
+  merge: two histories would have colliding ids. Ids are kept as they are, so
+  every play still points at its session and its end row. A file without the
+  current version marker is rejected, and the replace is confirmed first.
+
+  Clear stats deletes the three tables in one transaction, after a confirmation.
+
+  Both replace and clear can run while a track is playing, which takes the
+  current play's row away. Play ends are therefore written with
+  `INSERT ... SELECT ... WHERE EXISTS (play_start)`
+  [PlayEndDao.insertForExistingPlay], so a cleared history cannot leave an end
+  row behind that would still be counted by the engagement numbers.
 
 If a threshold changes, it changes in one place: `ListeningAnalytics` for
 the storage-side constants and `StatsActivity` for the display limits.

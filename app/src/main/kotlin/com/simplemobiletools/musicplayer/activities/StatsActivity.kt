@@ -1,7 +1,14 @@
 package com.simplemobiletools.musicplayer.activities
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.gson.Gson
+import com.simplemobiletools.commons.dialogs.ConfirmationDialog
 import com.simplemobiletools.commons.extensions.*
 import com.simplemobiletools.commons.helpers.NavigationIcon
 import com.simplemobiletools.commons.helpers.ensureBackgroundThread
@@ -15,6 +22,7 @@ import com.simplemobiletools.musicplayer.adapters.StatsTrackAdapter
 import com.simplemobiletools.musicplayer.adapters.StatsTrackRow
 import com.simplemobiletools.musicplayer.adapters.StatsValueAdapter
 import com.simplemobiletools.musicplayer.adapters.StatsValueRow
+import com.simplemobiletools.musicplayer.analytics.AnalyticsBackup
 import com.simplemobiletools.musicplayer.analytics.ListeningAnalyticsStore
 import com.simplemobiletools.musicplayer.analytics.daos.DailyStats
 import com.simplemobiletools.musicplayer.analytics.daos.SessionInfo
@@ -37,10 +45,16 @@ private const val RESOLVE_CHUNK_SIZE = 400
 private const val RECENT_SESSIONS_LIMIT = 5
 private const val WEEKLY_TOP_LIMIT = 5
 private const val MINUTES_PER_DAY = 24 * 60
+private const val EXPORT_STATS_INTENT = 1
+private const val IMPORT_STATS_INTENT = 2
+private const val STATS_FILE_MIME_TYPE = "application/json"
 
 class StatsActivity : SimpleActivity() {
 
     private val binding by viewBinding(ActivityStatsBinding::inflate)
+
+    /** The exported json, kept until the file picker returns the destination of the export. */
+    private var pendingExportJson = ""
     private val lastPlayedFormat = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
     private val sessionDateFormat = SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault())
     private val dayFormat = SimpleDateFormat("d MMM", Locale.getDefault())
@@ -53,12 +67,140 @@ class StatsActivity : SimpleActivity() {
         updateMaterialActivityViews(binding.statsCoordinator, binding.statsHolder, useTransparentNavigation = true, useTopSearchMenu = false)
         setupMaterialScrollListener(binding.statsNestedScrollview, binding.statsToolbar)
 
+        binding.statsToolbar.inflateMenu(R.menu.menu_stats)
+        binding.statsToolbar.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.stats_export -> exportStats()
+                R.id.stats_import -> pickStatsFile()
+                R.id.stats_clear -> confirmClearStats()
+                else -> return@setOnMenuItemClickListener false
+            }
+            return@setOnMenuItemClickListener true
+        }
+
         arrayOf(
             binding.statsSummaryList, binding.statsMostPlayedList, binding.statsArtistsList, binding.statsAlbumsList,
             binding.statsGenresList, binding.statsWeekdayHoursList, binding.statsWeekdaysList, binding.statsForgottenList, binding.statsDailyList,
             binding.statsSessionsList, binding.statsRecentSessionsList, binding.statsWeeklyList, binding.statsMonthList
         ).forEach {
             it.layoutManager = LinearLayoutManager(this)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
+        super.onActivityResult(requestCode, resultCode, resultData)
+        val uri = resultData?.data
+        when {
+            requestCode == EXPORT_STATS_INTENT && resultCode == Activity.RESULT_OK && uri != null -> writeStatsFile(uri)
+            requestCode == IMPORT_STATS_INTENT && resultCode == Activity.RESULT_OK && uri != null -> readStatsFile(uri)
+            requestCode == EXPORT_STATS_INTENT -> pendingExportJson = ""
+        }
+    }
+
+    private fun exportStats() {
+        ensureBackgroundThread {
+            val json = Gson().toJson(applicationContext.analytics.exportBackup())
+            runOnUiThread {
+                pendingExportJson = json
+                Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    type = STATS_FILE_MIME_TYPE
+                    putExtra(Intent.EXTRA_TITLE, "listening_stats_${getCurrentFormattedDateTime()}.json")
+                    addCategory(Intent.CATEGORY_OPENABLE)
+
+                    try {
+                        startActivityForResult(this, EXPORT_STATS_INTENT)
+                    } catch (e: ActivityNotFoundException) {
+                        toast(com.simplemobiletools.commons.R.string.system_service_disabled, Toast.LENGTH_LONG)
+                    } catch (e: Exception) {
+                        showErrorToast(e)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun writeStatsFile(uri: Uri) {
+        val json = pendingExportJson
+        pendingExportJson = ""
+        ensureBackgroundThread {
+            val success = try {
+                contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(json) } != null
+            } catch (e: Exception) {
+                false
+            }
+
+            runOnUiThread {
+                toast(if (success) R.string.stats_exported else R.string.stats_export_failed)
+            }
+        }
+    }
+
+    private fun pickStatsFile() {
+        Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            // an export renamed to .txt should still be usable, so the picker is not filtered by mime type
+            type = "*/*"
+
+            try {
+                startActivityForResult(this, IMPORT_STATS_INTENT)
+            } catch (e: ActivityNotFoundException) {
+                toast(com.simplemobiletools.commons.R.string.system_service_disabled, Toast.LENGTH_LONG)
+            } catch (e: Exception) {
+                showErrorToast(e)
+            }
+        }
+    }
+
+    private fun readStatsFile(uri: Uri) {
+        ensureBackgroundThread {
+            val backup = try {
+                contentResolver.openInputStream(uri)?.bufferedReader()?.use { Gson().fromJson(it.readText(), AnalyticsBackup::class.java) }
+            } catch (e: Exception) {
+                null
+            }
+
+            val isValid = backup != null && backup.version == AnalyticsBackup.VERSION
+            runOnUiThread {
+                if (isValid) {
+                    ConfirmationDialog(this, getString(R.string.import_stats_warning)) {
+                        importStats(backup!!)
+                    }
+                } else {
+                    toast(R.string.invalid_stats_file)
+                }
+            }
+        }
+    }
+
+    private fun importStats(backup: AnalyticsBackup) {
+        ensureBackgroundThread {
+            val success = try {
+                applicationContext.analytics.importBackup(backup)
+                true
+            } catch (e: Exception) {
+                false
+            }
+
+            runOnUiThread {
+                if (success) {
+                    toast(R.string.stats_imported)
+                    loadStats()
+                } else {
+                    toast(R.string.stats_import_failed)
+                }
+            }
+        }
+    }
+
+    private fun confirmClearStats() {
+        ConfirmationDialog(this, getString(R.string.clear_stats_warning)) {
+            ensureBackgroundThread {
+                applicationContext.analytics.clearAllData()
+                runOnUiThread {
+                    toast(R.string.stats_cleared)
+                    loadStats()
+                }
+            }
         }
     }
 

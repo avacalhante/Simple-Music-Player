@@ -83,5 +83,7 @@ internal fun PlaybackService.getPlayerListener() = object : Player.Listener {
 
     override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
         config.isShuffleEnabled = shuffleModeEnabled
+        // the notification's shuffle button shows the state, so its icon has to follow the player
+        refreshNotificationLayout(shuffleModeEnabled)
     }
 }

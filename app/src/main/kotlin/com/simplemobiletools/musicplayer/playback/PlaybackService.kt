@@ -101,6 +101,17 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
 
     internal fun withPlayer(callback: SimpleMusicPlayer.() -> Unit) = playerHandler.post { callback(player) }
 
+    /**
+     * Rebuilds the buttons of the media notification, so the shuffle icon matches the player's state.
+     * The player callbacks that ask for this run on the player thread, while the session has to be touched on
+     * its application thread, so the layout is set from the main thread.
+     */
+    internal fun refreshNotificationLayout(isShuffleEnabled: Boolean) {
+        Handler(Looper.getMainLooper()).post {
+            mediaSession.setCustomLayout(getCustomLayout(isShuffleEnabled))
+        }
+    }
+
     private fun showNoPermissionNotification() {
         Handler(Looper.getMainLooper()).postDelayed(delayInMillis = 100L) {
             try {

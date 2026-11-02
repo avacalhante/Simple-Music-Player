@@ -11,6 +11,20 @@ interface PlayEndDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(end: PlayEnd): Long
 
+    @Query("DELETE FROM play_end")
+    fun deleteAll()
+
+    /**
+     * Records an end only while the play it belongs to still exists. The stats can be cleared or replaced while
+     * a track is playing, and an end row without a play would still be counted by the engagement queries.
+     */
+    @Query("""
+        INSERT INTO play_end (play_start_id, ended_at, position_at_end, fully_played, skipped, quick_skip)
+        SELECT :playStartId, :endedAt, :positionAtEnd, :fullyPlayed, :skipped, :quickSkip
+        WHERE EXISTS (SELECT 1 FROM play_start WHERE id = :playStartId)
+    """)
+    fun insertForExistingPlay(playStartId: Long, endedAt: Int, positionAtEnd: Int, fullyPlayed: Int, skipped: Int, quickSkip: Int)
+
     @Query("SELECT * FROM play_end ORDER BY ended_at DESC")
     fun getAll(): List<PlayEnd>
 

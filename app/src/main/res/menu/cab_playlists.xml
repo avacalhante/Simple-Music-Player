@@ -16,6 +16,11 @@
         android:title="@string/delete"
         app:showAsAction="always" />
     <item
+        android:id="@+id/cab_export"
+        android:showAsAction="never"
+        android:title="@string/export_playlists"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/cab_select_all"
         android:icon="@drawable/ic_select_all_vector"
         android:showAsAction="always"

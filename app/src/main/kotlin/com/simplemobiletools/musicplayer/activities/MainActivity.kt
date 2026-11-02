@@ -336,8 +336,35 @@ class MainActivity : SimpleMusicActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         super.onActivityResult(requestCode, resultCode, resultData)
-        if (requestCode == PICK_IMPORT_SOURCE_INTENT && resultCode == Activity.RESULT_OK && resultData != null && resultData.data != null) {
+        if (requestCode == PlaylistExporter.REQUEST_CODE) {
+            exportPlaylistsTo(resultCode, resultData)
+        } else if (requestCode == PICK_IMPORT_SOURCE_INTENT && resultCode == Activity.RESULT_OK && resultData != null && resultData.data != null) {
             tryImportPlaylistFromFile(resultData.data!!)
+        }
+    }
+
+    /** Writes the playlists selected in the playlists tab into the folder the user picked. */
+    private fun exportPlaylistsTo(resultCode: Int, resultData: Intent?) {
+        val treeUri = resultData?.data
+        if (resultCode != Activity.RESULT_OK || treeUri == null) {
+            PlaylistExporter.forget()
+            return
+        }
+
+        try {
+            contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        } catch (ignored: Exception) {
+        }
+
+        ensureBackgroundThread {
+            val exported = PlaylistExporter.write(this, treeUri)
+            runOnUiThread {
+                if (exported > 0) {
+                    toast(resources.getQuantityString(R.plurals.playlists_exported, exported, exported))
+                } else {
+                    toast(com.simplemobiletools.commons.R.string.exporting_failed)
+                }
+            }
         }
     }
 

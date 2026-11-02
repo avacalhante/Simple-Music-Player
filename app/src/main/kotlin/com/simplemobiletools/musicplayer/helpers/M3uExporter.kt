@@ -28,14 +28,7 @@ class M3uExporter(val activity: BaseSimpleActivity) {
         activity.toast(com.simplemobiletools.commons.R.string.exporting)
 
         try {
-            outputStream.bufferedWriter().use { out ->
-                out.writeLn(M3U_HEADER)
-                for (track in tracks) {
-                    out.writeLn(M3U_ENTRY + track.duration + M3U_DURATION_SEPARATOR + track.artist + " - " + track.title)
-                    out.writeLn(track.path)
-                    exportedEvents++
-                }
-            }
+            writeTo(outputStream, tracks) { exportedEvents++ }
         } catch (e: Exception) {
             failedEvents++
             activity.showErrorToast(e)
@@ -50,5 +43,19 @@ class M3uExporter(val activity: BaseSimpleActivity) {
                 else -> ExportResult.EXPORT_OK
             }
         )
+    }
+
+    companion object {
+        /** Writes the m3u content, shared with the multi-playlist export which owns its own destination file. */
+        fun writeTo(outputStream: OutputStream, tracks: List<Track>, onTrackWritten: () -> Unit = {}) {
+            outputStream.bufferedWriter().use { out ->
+                out.writeLn(M3U_HEADER)
+                for (track in tracks) {
+                    out.writeLn(M3U_ENTRY + track.duration + M3U_DURATION_SEPARATOR + track.artist + " - " + track.title)
+                    out.writeLn(track.path)
+                    onTrackWritten()
+                }
+            }
+        }
     }
 }

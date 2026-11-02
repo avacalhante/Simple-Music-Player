@@ -11,6 +11,13 @@ interface ListeningSessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(session: ListeningSession): Long
 
+    /** All sessions with their ids, for a backup that can be restored as it was. */
+    @Query("SELECT * FROM listening_sessions ORDER BY started_at ASC")
+    fun getAll(): List<ListeningSession>
+
+    @Query("DELETE FROM listening_sessions")
+    fun deleteAll()
+
     /**
      * The newest open session with its last listening activity, used to continue a session across a process
      * death or an app restart while the session gap window is still alive.

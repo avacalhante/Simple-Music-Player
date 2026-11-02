@@ -116,6 +116,7 @@ dependencies {
     implementation(libs.eventbus)
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.documentfile)
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.exoplayer)

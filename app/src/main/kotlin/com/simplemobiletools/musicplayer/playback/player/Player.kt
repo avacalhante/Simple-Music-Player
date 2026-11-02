@@ -46,7 +46,7 @@ internal fun PlaybackService.initializeSessionAndPlayer(handleAudioFocus: Boolea
         setRepeatMode(config.playbackSetting)
         setPlaybackSpeed(config.playbackSpeed)
         shuffleModeEnabled = config.isShuffleEnabled
-        mediaSession.setCustomLayout(getCustomLayout())
+        mediaSession.setCustomLayout(getCustomLayout(config.isShuffleEnabled))
         SimpleEqualizer.setupEqualizer(this@initializeSessionAndPlayer, player)
     }
 }
