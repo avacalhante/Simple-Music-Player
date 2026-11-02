@@ -76,6 +76,7 @@ internal fun PlaybackService.getMediaSessionCallback() = object : MediaLibrarySe
             CustomCommands.TOGGLE_SKIP_SILENCE -> player.setSkipSilence(config.gaplessPlayback)
             CustomCommands.SET_SHUFFLE_ORDER -> setShuffleOrder(args)
             CustomCommands.SET_NEXT_ITEM -> setNextItem(args)
+            CustomCommands.TOGGLE_SHUFFLE -> withPlayer { shuffleModeEnabled = !shuffleModeEnabled }
         }
 
         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
