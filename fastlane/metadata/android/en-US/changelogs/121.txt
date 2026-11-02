@@ -1,0 +1,3 @@
+ * The notification's close button now closes the player and removes the notification
+ * Fixed a crash when closing the app from the recent apps screen
+ * Playback and the notification now survive closing the app from the recent apps screen

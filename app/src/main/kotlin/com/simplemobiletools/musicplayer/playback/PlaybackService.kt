@@ -1,5 +1,6 @@
 package com.simplemobiletools.musicplayer.playback
 
+import android.content.Intent
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -45,13 +46,33 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
         SimpleEqualizer.release()
     }
 
+    /**
+     * Stops playback and removes the notification. Clearing the media items is what makes Media3 drop the
+     * notification: it keeps showing one for a stopped player as long as the timeline is not empty.
+     */
     fun stopService() {
         withPlayer {
             pause()
             stop()
+            clearMediaItems()
+            stopSelf()
         }
+    }
 
-        stopSelf()
+    /**
+     * The default [MediaSessionService.onTaskRemoved] calls [MediaSession.getPlayer] on the main thread.
+     * The player and its session live on [playerThread], so that implementation throws "Player callback
+     * method is called from a wrong thread" and takes the process down. Do it on the player thread instead
+     * and keep the app's old behaviour: swiping the task away leaves playback and the notification alone.
+     * The service is only stopped when there is nothing left to control, which is the state the
+     * notification's close button leaves behind.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        withPlayer {
+            if (mediaItemCount == 0) {
+                stopSelf()
+            }
+        }
     }
 
     private fun initializeLibrary() {

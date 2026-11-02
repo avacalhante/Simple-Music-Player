@@ -1,6 +1,13 @@
 Changelog
 ==========
 
+Version 5.18.5 *(2026-11-01)*
+----------------------------
+
+ * The notification's close button now closes the player and removes the notification
+ * Fixed a crash when closing the app from the recent apps screen
+ * Playback and the notification now survive closing the app from the recent apps screen
+
 Version 5.18.4 *(2026-10-31)*
 ----------------------------
 

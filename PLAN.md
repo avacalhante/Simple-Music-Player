@@ -2,7 +2,7 @@
 
 This is a working plan, not a promise of scope. Update the checkboxes as work lands.
 
-Last updated: 2026-10-31
+Last updated: 2026-11-01
 
 ## Constraints (agreed with the owner)
 
@@ -127,6 +127,8 @@ Do **not** couple this phase with UI changes. The notification/lock-screen prese
 - Skipping a track used to wait out the full 300 ms seek coalescing window before the player started preparing the next item, so even a single skip felt delayed. The first tap now seeks immediately; only taps that arrive inside the window are coalesced into one final seek. Measured through the media session: item transition ~390 ms → ~90 ms, playback ~640–970 ms → ~370–500 ms, and 1/5/8 rapid skips still advance the queue by exactly 1/5/8.
 - The album art flicker while skipping came from stale background loads: a cover requested for an earlier track could finish after the newer one and be applied on top of it. Artwork callbacks are now ignored unless they belong to the newest request (full player and mini player).
 - A/B testing Media3 1.1.1 against 1.11.1 with identical measurement showed no playback-engine regression, which is why the fix is in the app's seek and artwork handling rather than in the dependency.
+- The notification close button only paused and stopped the player, so Media3 kept showing an idle notification without a seekbar. Closing now also clears the media items, which is what makes Media3 remove the notification.
+- Swiping the app away crashed with `Player callback method is called from a wrong thread`: Media3 1.11's default `MediaSessionService.onTaskRemoved` reads `MediaSession.getPlayer` on the main thread, while this app runs the player (and therefore the session) on `PlayerThread`. `onTaskRemoved` is now overridden and runs on the player thread; it keeps playback and the notification alive, and only stops the service when the close button left the player empty.
 
 ## Suggested order
 
