@@ -41,7 +41,8 @@ internal fun Context.getCustomLayout(isShuffleEnabled: Boolean): List<CommandBut
     val shuffleButton = CommandButton.Builder()
         .setDisplayName(getString(if (isShuffleEnabled) R.string.disable_shuffle else R.string.enable_shuffle))
         .setSessionCommand(CustomCommands.TOGGLE_SHUFFLE.sessionCommand)
-        .setIconResId(R.drawable.ic_shuffle_vector)
+        // notification icons cannot be tinted, so the enabled state gets its own drawable
+        .setIconResId(if (isShuffleEnabled) R.drawable.ic_shuffle_on_vector else R.drawable.ic_shuffle_vector)
         .build()
 
     val closeButton = CommandButton.Builder()
