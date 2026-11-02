@@ -22,6 +22,10 @@ data class PlayStart(
     @ColumnInfo(name = "started_at")
     val startedAt: Int,
 
+    /** How far into the track playback began, non-zero when a saved position was resumed. */
+    @ColumnInfo(name = "start_position_seconds")
+    val startPositionSeconds: Int = 0,
+
     @ColumnInfo(name = "duration_seconds")
     val durationSeconds: Int = 0,
 

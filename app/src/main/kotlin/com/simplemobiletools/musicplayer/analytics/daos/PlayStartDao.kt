@@ -29,11 +29,15 @@ interface PlayStartDao {
     @Query("SELECT DISTINCT track_id FROM play_start")
     fun getDistinctTrackIds(): List<Long>
 
+    /**
+     * Tracks whose latest play is older than the cutoff. The cutoff has to be applied to the grouped maximum,
+     * not in a WHERE clause: filtering the rows first would still report a track that was also played recently.
+     */
     @Query("""
         SELECT track_id, MAX(started_at) AS last_played_at
         FROM play_start
-        WHERE started_at < :cutoffEpochSeconds
         GROUP BY track_id
+        HAVING MAX(started_at) < :cutoffEpochSeconds
         ORDER BY last_played_at ASC
         LIMIT :limit
     """)
@@ -71,11 +75,14 @@ interface PlayStartDao {
             strftime('%Y-%m-%d', started_at, 'unixepoch', 'localtime') AS day,
             COUNT(*) AS play_count,
             SUM(
-                COALESCE(
-                    (SELECT position_at_end
-                     FROM play_end
-                     WHERE play_end.play_start_id = play_start.id),
-                    0
+                MAX(
+                    0,
+                    COALESCE(
+                        (SELECT position_at_end
+                         FROM play_end
+                         WHERE play_end.play_start_id = play_start.id),
+                        0
+                    ) - start_position_seconds
                 )
             ) AS played_seconds
         FROM play_start

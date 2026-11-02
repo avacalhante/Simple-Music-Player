@@ -1,6 +1,7 @@
 # Listening Analytics — Parallel Work Plan
 
-Last updated: 2026-10-31
+Last updated: 2026-11-01
+Status: implemented on `analytics/listening-stats`, merged into `master` and shipped in 5.18.6.
 Branch intent: a new parallel line for song-centric tracking/analytics, independent of `feat/toolchain-refresh` (Phase 5).
 
 ## Goal
@@ -14,7 +15,7 @@ This plan is intentionally scoped to start small and stay independent of the cur
 - No UI/appearance changes beyond what is needed to expose stats later. The existing freeze on UI still applies; this plan is backend-first.
 - No changes to playback behavior, queue persistence, Media3 version, or the toolchain.
 - No mixing this feature into `songs.db`. It gets its own database file.
-- Sessions are out of scope for the first version; they come later.
+- Sessions were out of scope for the first version and were added later, in analytics schema version 2.
 - No analytics network calls, no external services, no identifiers leaving the device.
 
 ## Independence from current branch
@@ -59,7 +60,7 @@ This app does not already use coroutines broadly in the parts I touched, so I wo
    - `playlist_id` int — the playlist the playback came from, if known; `0` if not
    - `source` text — one of `all_tracks`, `folder`, `playlist`, `album`, `artist`, `genre`, `queue`, `unknown`
    - `started_at` int not null — epoch seconds
-   - `session_id` long — reserved for the future sessions feature; for now always `0L`
+   - `session_id` long — the listening session the play belongs to; `0` for rows recorded before sessions existed
 
 2. `play_end`
    - `id` long primary key autogenerate
@@ -150,22 +151,22 @@ Before sessions, the meaningful summaries are mostly per-track and per-period. I
 
 ## Still pending
 
-- Sessions: longest/average session, songs per session, time between sessions.
 - Real per-playlist attribution, and genre/playlist breakdowns beyond play counts.
 - Never-played tracks as a list (currently only a count in the summary).
 - Periodic summaries and milestones.
+- Time between sessions (the session table already stores enough information to derive it).
 
 ## What I would not build yet
 
-- Session tables, session reconstruction, longest uninterrupted session, time-between-sessions.
-- Playlist completion rate as a first-class metric; that needs session/playlist-end semantics I would rather add after the event pipeline is proven.
-- Expectation of perfectly accurate `source`/`playlist_id` for every play. Early on, missing context will be recorded as `unknown`/`0`.
+- Playlist completion rate as a first-class metric; that needs playlist-end semantics rather than the current per-track events.
+- Expectation of perfectly accurate `source`/`playlist_id` for every play. Missing context is recorded as `unknown`/`0`.
 
 ## Migration and version plan
 
-- Analytics schema starts at version 1 in `analytics.db`.
-- Because it is a new database, there is no legacy migration burden for the first implementation.
-- If the analytics schema later changes, it will get its own migration chain and schema location, independent of `songs.db` version 15.
+- Analytics schema is at version 3 in `analytics.db`: version 1 held `play_start` and `play_end`, version 2 added `listening_sessions`, version 3 added `play_start.start_position_seconds`.
+- `MIGRATION_1_2` only creates the session table, so plays recorded before sessions keep `session_id = 0` and are not part of any session.
+- `MIGRATION_2_3` adds the start position with a default of 0, which preserves how older rows were already counted.
+- Future analytics schema changes get their own migration and schema file, independent of `songs.db`.
 
 ## Files I expect to add
 
@@ -192,31 +193,34 @@ There are no tests in this project. For this feature I would verify by:
 
 ## Implementation notes (current state)
 
-What actually exists on this branch:
+What exists now:
 
-- `analytics/AnalyticsDatabase.kt` — `analytics.db`, version 1, schema exported to `app/schemas/.../AnalyticsDatabase/1.json`.
-- `analytics/entities/PlayStart.kt` and `PlayEnd.kt` — event tables. `play_start` also holds `duration_seconds`, because the player duration is only known after preparation; it is filled in later via `updateDuration`.
-- `analytics/daos/` — `PlayStartDao`, `PlayEndDao` and the query result classes in `AnalyticsQueries.kt` (columns mapped with `@ColumnInfo`).
-- `analytics/ListeningAnalytics.kt` — the singleton store with the first-version read layer.
-- `analytics/AnalyticsRecorder.kt` — per-play state machine (start / position / end).
+- `analytics/AnalyticsDatabase.kt` — `analytics.db`, version 3, schemas exported to `app/schemas/.../AnalyticsDatabase/`.
+- `analytics/entities/PlayStart.kt`, `PlayEnd.kt` and `ListeningSession.kt` — event and session tables. `play_start` also holds `duration_seconds`, because the player duration is only known after preparation; it is filled in later via `updateDuration`.
+- `analytics/daos/` — `PlayStartDao`, `PlayEndDao`, `ListeningSessionDao` and the query result classes in `AnalyticsQueries.kt` (columns mapped with `@ColumnInfo`).
+- `analytics/ListeningAnalytics.kt` — the singleton store with the read layer and session lifecycle.
+- `analytics/AnalyticsRecorder.kt` — per-play state machine (start / position / end). The database is opened lazily on `AnalyticsExecutor`.
 - `analytics/AnalyticsPlaybackBridge.kt` — the only playback-facing type; posts every write to `AnalyticsExecutor` (single thread) so playback is never blocked and event order is preserved.
 - `analytics/SessionContext.kt` — maps the current library root to `source`.
 - `analytics/AnalyticsExecutor.kt`, `analytics/extensions/AnalyticsContext.kt` — executor and `context.analytics`.
 
-Stats screen: `StatsActivity` (opened from the main menu) is one scroll of sections: a summary (total plays, total listening time, finished vs skipped ratio, how many library tracks were never played), the most played tracks, artists, albums and genres, listening by hour and by day of week, tracks not played in the last 90 days, and listening time for the last 14 local days. Daily buckets use device-local dates, and a day's listening time is the sum of the recorded end positions, so plays that never ended are excluded.
+`play_start` is only written when playback actually starts. Preparing or restoring the queue while paused also fires a media item transition in Media3, but that does not count as a play; a later start is caught by `onIsPlayingChanged`. Pausing and resuming the same track keeps the same attempt.
+
+Stats screen: `StatsActivity` (opened from the main menu) is one scroll of sections: a summary (total plays, total listening time, finished vs skipped ratio, how many library tracks were never played), the week's top 5 and the month's most played track, the most played tracks/artists/albums/genres, average listening hours per weekday and plays per weekday, tracks not played in the last 90 days, listening time for the last 14 local days, and session statistics with the most recent sessions. Daily buckets use device-local dates, and a day's listening time is the sum of the recorded end positions, so plays that never ended are excluded.
 
 End positions come from `Player.Listener.onPositionDiscontinuity`, which Media3 fires for the outgoing item before `onMediaItemTransition`; a same-item seek does not end the play attempt. On service shutdown the player's current position is recorded too.
 
-Known limitation: per-playlist attribution is not wired yet, so `playlist_id` is `ALL_TRACKS_PLAYLIST_ID` only for the all-tracks root and `0` (unknown) elsewhere. The browse tree reports the current root, not the playlist a track was opened from.
+Known limitation: per-playlist attribution is not wired yet, so `playlist_id` is `ALL_TRACKS_PLAYLIST_ID` only when the browse root is the all-tracks root and `0` (unknown) elsewhere. The local UI plays from its own queue rather than browsing through the media session, so most plays currently record `source = "unknown"`.
 
-## Open decisions I already made for you
+## Defaults in use
 
-Per your direction:
 - new database for analytics: yes
-- sessions later: yes
-- thresholds: I picked defaults
+- sessions: implemented in schema version 2
+- thresholds
   - quick skip: 15 seconds
+  - end-of-track leeway: 3 seconds
+  - session gap: 5 minutes
   - repeat window: 10 minutes
   - "long time" / "not recently played": 90 days
 
-If you want different defaults, I can change them before implementation.
+Change the storage constants in `ListeningAnalytics`/`AnalyticsRecorder` and the display limits in `StatsActivity`.

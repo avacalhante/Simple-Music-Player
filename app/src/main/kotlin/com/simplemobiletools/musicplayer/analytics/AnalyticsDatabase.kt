@@ -15,7 +15,7 @@ import com.simplemobiletools.musicplayer.analytics.entities.PlayStart
 
 @Database(
     entities = [PlayStart::class, PlayEnd::class, ListeningSession::class],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AnalyticsDatabase : RoomDatabase() {
@@ -39,7 +39,7 @@ abstract class AnalyticsDatabase : RoomDatabase() {
                         )
                             .setQueryExecutor(AnalyticsExecutor.myExecutor)
                             .setTransactionExecutor(AnalyticsExecutor.myExecutor)
-                            .addMigrations(MIGRATION_1_2)
+                            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                             .build()
                     }
                 }
@@ -58,6 +58,16 @@ abstract class AnalyticsDatabase : RoomDatabase() {
                     "CREATE TABLE IF NOT EXISTS `listening_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                         "`started_at` INTEGER NOT NULL, `ended_at` INTEGER NOT NULL)"
                 )
+            }
+        }
+
+        /**
+         * Records where in the track a play began, so resuming a saved position is not counted as listening time.
+         * Rows written before this column existed keep 0, which matches how they were already counted.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `play_start` ADD COLUMN `start_position_seconds` INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

@@ -62,7 +62,17 @@ internal fun PlaybackService.getPlayerListener() = object : Player.Listener {
             analyticsBridge.onTrackEnd()
         }
 
-        mediaItem?.let { analyticsBridge.onTrackStart(it) }
+        // Preparing or restoring the queue also fires a transition while the player is paused, so only count a
+        // play once it actually starts. Starting playback later is caught by onIsPlayingChanged.
+        if (mediaItem != null && player.isPlaying) {
+            analyticsBridge.onTrackStart(mediaItem, player.currentPosition)
+        }
+    }
+
+    override fun onIsPlayingChanged(isPlaying: Boolean) {
+        if (isPlaying) {
+            player.currentMediaItem?.let { analyticsBridge.onTrackStart(it, player.currentPosition) }
+        }
     }
 
     override fun onRepeatModeChanged(repeatMode: Int) {

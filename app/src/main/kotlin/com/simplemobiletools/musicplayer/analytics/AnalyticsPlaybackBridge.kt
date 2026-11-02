@@ -18,10 +18,10 @@ class AnalyticsPlaybackBridge(service: PlaybackService) {
         currentRootId = rootId
     }
 
-    fun onTrackStart(mediaItem: MediaItem) {
+    fun onTrackStart(mediaItem: MediaItem, startPositionMs: Long) {
         val playlistId = SessionContext.playlistIdFor(currentRootId)
         val source = SessionContext.sourceFor(currentRootId)
-        post { recorder.onTrackStart(mediaItem, playlistId, source) }
+        post { recorder.onTrackStart(mediaItem, playlistId, source, startPositionMs) }
     }
 
     fun onTrackEnd(positionMs: Long? = null, durationMs: Long? = null) {

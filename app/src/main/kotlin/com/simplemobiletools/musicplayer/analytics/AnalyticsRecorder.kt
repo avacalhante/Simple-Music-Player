@@ -5,13 +5,17 @@ import androidx.media3.common.MediaItem
 import com.simplemobiletools.musicplayer.analytics.extensions.analytics
 
 class AnalyticsRecorder(context: Context) {
-    private val analytics = context.analytics
+    private val appContext = context.applicationContext
+
+    // every recorder entry point already runs on AnalyticsExecutor, so the database is opened there, not on main
+    private val analytics by lazy { appContext.analytics }
 
     private var currentPlayStartId: Long = 0L
     private var currentTrackId: Long = 0L
     private var currentPlaylistId: Int = 0
     private var currentSource: String = "unknown"
     private var currentStartedAt: Int = 0
+    private var currentStartPositionSeconds: Int = 0
     private var lastKnownPositionMs: Long = 0L
     private var lastKnownDurationMs: Long = 0L
     private var persistedDurationSeconds: Int = 0
@@ -19,13 +23,21 @@ class AnalyticsRecorder(context: Context) {
     fun onTrackStart(
         mediaItem: MediaItem,
         playlistId: Int,
-        source: String
+        source: String,
+        startPositionMs: Long
     ) {
+        val trackId = mediaItem.mediaId.toLongOrNull() ?: 0L
+        if (trackId > 0 && trackId == currentTrackId && currentPlayStartId > 0) {
+            // the same attempt is already being recorded, e.g. a transient buffering change re-reports it
+            return
+        }
+
         currentPlayStartId = 0L
-        currentTrackId = mediaItem.mediaId.toLongOrNull() ?: 0L
+        currentTrackId = trackId
         currentPlaylistId = playlistId
         currentSource = source
         currentStartedAt = nowSeconds()
+        currentStartPositionSeconds = (startPositionMs.coerceAtLeast(0L) / 1000L).toInt()
         lastKnownPositionMs = 0L
         // the duration is only known once the player has prepared the item, so it arrives via onPositionChanged
         lastKnownDurationMs = 0L
@@ -37,6 +49,7 @@ class AnalyticsRecorder(context: Context) {
                 playlistId = currentPlaylistId,
                 source = currentSource,
                 startedAt = currentStartedAt,
+                startPositionSeconds = currentStartPositionSeconds,
                 // filled in by onPositionChanged once the player knows the real duration
                 durationSeconds = 0,
                 sessionId = ensureSession(currentStartedAt)
@@ -84,11 +97,12 @@ class AnalyticsRecorder(context: Context) {
         val nowSec = nowSeconds()
         val positionSec = (positionMs ?: lastKnownPositionMs).div(1000)
         val effectiveDurationSec = lastKnownDurationMs.div(1000)
+        val listenedSec = (positionSec - currentStartPositionSeconds).coerceAtLeast(0L)
 
         // when the duration never became known the track cannot be judged as finished
         val fullyPlayed = effectiveDurationSec > 0 && positionSec >= (effectiveDurationSec - QUICK_SKIP_LEEWAY_SECONDS)
         val skipped = !fullyPlayed
-        val quickSkip = skipped && positionSec <= ListeningAnalytics.QUICK_SKIP_SECONDS
+        val quickSkip = skipped && listenedSec <= ListeningAnalytics.QUICK_SKIP_SECONDS
 
         analytics.recordPlayEnd(
             playStartId = currentPlayStartId,
@@ -104,6 +118,7 @@ class AnalyticsRecorder(context: Context) {
         currentPlaylistId = 0
         currentSource = "unknown"
         currentStartedAt = 0
+        currentStartPositionSeconds = 0
         lastKnownPositionMs = 0L
         lastKnownDurationMs = 0L
         persistedDurationSeconds = 0

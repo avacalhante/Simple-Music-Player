@@ -16,7 +16,7 @@ class DailyListeningAdapter(
     private val items: List<DailyStats>
 ) : RecyclerView.Adapter<DailyListeningAdapter.ViewHolder>() {
 
-    private val storedDayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    private val storedDayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     private val displayDayFormat = SimpleDateFormat("EEE, MMM d", Locale.getDefault())
 
     inner class ViewHolder(val binding: ItemStatsDayBinding) : RecyclerView.ViewHolder(binding.root)

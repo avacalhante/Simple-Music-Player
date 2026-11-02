@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Listening analytics stays on this device, so it is not uploaded by Android's auto backup. -->
+<full-backup-content>
+    <exclude
+        domain="database"
+        path="analytics.db" />
+    <exclude
+        domain="database"
+        path="analytics.db-shm" />
+    <exclude
+        domain="database"
+        path="analytics.db-wal" />
+</full-backup-content>

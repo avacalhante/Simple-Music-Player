@@ -45,13 +45,22 @@ class ListeningAnalyticsStore(private val context: Context) {
 
     // ---- raw persistence ----
 
-    fun recordPlayStart(trackId: Long, playlistId: Int, source: String, startedAt: Int, durationSeconds: Int, sessionId: Long = 0L): Long {
+    fun recordPlayStart(
+        trackId: Long,
+        playlistId: Int,
+        source: String,
+        startedAt: Int,
+        startPositionSeconds: Int,
+        durationSeconds: Int,
+        sessionId: Long = 0L
+    ): Long {
         return playStartDao.insert(
             PlayStart(
                 trackId = trackId,
                 playlistId = playlistId,
                 source = source,
                 startedAt = startedAt,
+                startPositionSeconds = startPositionSeconds,
                 durationSeconds = durationSeconds,
                 sessionId = sessionId
             )

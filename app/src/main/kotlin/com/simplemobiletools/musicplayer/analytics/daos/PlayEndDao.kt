@@ -30,8 +30,8 @@ interface PlayEndDao {
         SELECT COALESCE(
                    SUM(
                        CASE WHEN p.duration_seconds > 0
-                            THEN MIN(e.position_at_end, p.duration_seconds)
-                            ELSE e.position_at_end
+                            THEN MAX(0, MIN(e.position_at_end, p.duration_seconds) - p.start_position_seconds)
+                            ELSE MAX(0, e.position_at_end - p.start_position_seconds)
                        END
                    ),
                    0
@@ -70,7 +70,7 @@ interface PlayEndDao {
     @Query("""
         SELECT
             p.track_id AS track_id,
-            COALESCE(SUM(e.ended_at - p.started_at), 0) AS played_seconds,
+            COALESCE(SUM(MAX(0, e.position_at_end - p.start_position_seconds)), 0) AS played_seconds,
             COUNT(e.id) AS end_count
         FROM play_start p
         LEFT JOIN play_end e ON e.play_start_id = p.id
@@ -85,7 +85,7 @@ interface PlayEndDao {
     @Query("""
         SELECT
             p.playlist_id AS playlist_id,
-            COALESCE(SUM(e.ended_at - p.started_at), 0) AS played_seconds,
+            COALESCE(SUM(MAX(0, e.position_at_end - p.start_position_seconds)), 0) AS played_seconds,
             COUNT(e.id) AS end_count
         FROM play_start p
         LEFT JOIN play_end e ON e.play_start_id = p.id

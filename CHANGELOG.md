@@ -1,6 +1,13 @@
 Changelog
 ==========
 
+Version 5.18.6 *(2026-11-01)*
+----------------------------
+
+ * Added a Listening stats screen with plays, listening time, top tracks, artists, albums and genres
+ * See your weekday listening habits, forgotten tracks and listening sessions
+ * Listening history is kept on the device in its own database and never leaves it
+
 Version 5.18.5 *(2026-11-01)*
 ----------------------------
 

@@ -33,6 +33,8 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
 
     override fun onCreate() {
         super.onCreate()
+        // The player callbacks and the browse callbacks touch the bridge, so create it before either can fire.
+        analyticsBridge = AnalyticsPlaybackBridge(this)
         setListener(this)
         initializeSessionAndPlayer(handleAudioFocus = true, handleAudioBecomingNoisy = true, skipSilence = config.gaplessPlayback)
         initializeLibrary()
@@ -81,8 +83,6 @@ class PlaybackService : MediaLibraryService(), MediaSessionService.Listener {
         mediaItemProvider = MediaItemProvider(this)
         if (hasPermission(getPermissionToRequest())) {
             mediaItemProvider.reload()
-            // Attach analytics bridge after MediaItemProvider is available.
-            analyticsBridge = AnalyticsPlaybackBridge(this)
         } else {
             showNoPermissionNotification()
         }

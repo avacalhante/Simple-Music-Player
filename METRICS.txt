@@ -13,8 +13,12 @@ Reading this file: [source] names the class or file, [table] names a table.
 -------------
 
 play_start  [table]
-  One row per track start. Written when Media3 reports a media item
-  transition to a new item (see `AnalyticsRecorder.onTrackStart`).
+  One row per track start. Written when playback actually starts: either a
+  media item transition while the player is already playing, or
+  onIsPlayingChanged(true) after starting/pressing play (see
+  `AnalyticsRecorder.onTrackStart`). Preparing or restoring the queue while
+  paused also fires a transition, but does not write a play. Pausing and
+  resuming one track keeps the same attempt.
 
     track_id        MediaStore id of the track (NOT the library Room row id)
     playlist_id     all-tracks playlist id when the browse root was the
@@ -22,9 +26,13 @@ play_start  [table]
     source          browse root at the time: all_tracks, playlist, folder,
                     artist, album, genre, or "unknown"
     started_at      epoch seconds
+    start_position_seconds
+                    how far into the track playback began. Non-zero when a
+                    saved queue position was resumed, so listening time and
+                    quick skips are measured from here, not from 0.
     duration_seconds  starts at 0 and is back-filled once the player
                     reports a duration (the media metadata does not carry
-                    one in Media3 1.1.1)
+                    one in Media3 1.11.1)
     session_id      the listening session this play belongs to (0 when the
                     play is not attributable to a session)
 
@@ -44,7 +52,8 @@ play_end  [table]
     position_at_end how far the track got, in seconds
     fully_played    1 when position >= duration - 3 seconds
     skipped         1 when not fully played (the complement of fully_played)
-    quick_skip      1 when skipped and position <= 15 seconds
+    quick_skip      1 when skipped and only <= 15 seconds were listened to
+                    (position_at_end - start_position_seconds)
 
 
 2. THRESHOLDS (defaults picked by judgement, not by measurement)
@@ -71,9 +80,13 @@ SUMMARY
 
   Total plays              COUNT(play_start)
   Total listening time     SUM over play_end of
-                           MIN(position_at_end, duration_seconds) when the
-                           duration is known, otherwise position_at_end.
+                           MAX(0, MIN(position_at_end, duration_seconds)
+                                  - start_position_seconds)
+                           when the duration is known, otherwise
+                           MAX(0, position_at_end - start_position_seconds).
                            [PlayEndDao.getTotalListenedSeconds]
+                           Start position is subtracted so resuming a saved
+                           position does not count the part played earlier.
                            Plays that never ended have no play_end row, so
                            they contribute nothing: paused or abandoned time
                            is never counted as listening.
@@ -173,13 +186,16 @@ PLAYS BY DAY OF WEEK
 
 NOT PLAYED RECENTLY  ("forgotten favorites")
 
-  SELECT track_id, MAX(started_at) FROM play_start
-  WHERE started_at < now - 90 days
-  GROUP BY track_id ORDER BY last_played_at ASC LIMIT 20
+  SELECT track_id, MAX(started_at) AS last_played_at FROM play_start
+  GROUP BY track_id
+  HAVING MAX(started_at) < now - 90 days
+  ORDER BY last_played_at ASC LIMIT 20
 
-  Oldest first. The trailing value on each row is that date. Section is
-  hidden when nothing has ever been played, and shows its empty text when
-  everything played is recent.
+  The cutoff is applied to the grouped maximum, not with a WHERE clause:
+  filtering rows first would still list a track that was played recently
+  just because it also has an old play. Oldest first; the trailing value
+  on each row is that date. Section is hidden when nothing has ever been
+  played, and shows its empty text when everything played is recent.
 
 LISTENING SESSIONS / RECENT SESSIONS
 
@@ -252,9 +268,10 @@ LISTENING SESSIONS / RECENT SESSIONS
 LISTENING TIME BY DAY
 
   bucket   strftime('%Y-%m-%d', started_at,'unixepoch','localtime')
-  value    SUM of position_at_end for the plays started that day
+  value    SUM of MAX(0, position_at_end - start_position_seconds) for the
+           ended plays started that day
   Newest day first, last 14 days. Local timezone, so it matches how you
-  think of a listening day.
+  think of a listening day. Plays that never ended are left out.
 
 
 4. OTHER QUERIES IN THE READ LAYER (not shown yet)
