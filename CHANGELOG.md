@@ -1,6 +1,14 @@
 Changelog
 ==========
 
+Version 5.18.7 *(2026-11-02)*
+----------------------------
+
+ * Added a "Songs you rarely skip" section to the listening stats, with how often you listen each track to the end
+ * The media notification has a shuffle button, and its icon shows whether shuffle is on
+ * Listening stats can be exported to a file, imported back and cleared
+ * Several playlists can be exported at once
+
 Version 5.18.6 *(2026-11-01)*
 ----------------------------
 

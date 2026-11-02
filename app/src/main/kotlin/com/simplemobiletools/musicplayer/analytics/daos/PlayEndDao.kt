@@ -81,6 +81,24 @@ interface PlayEndDao {
     """)
     fun getTracksStoppedPartway(minPlays: Int, limit: Int): List<TrackPartialStopStats>
 
+    /**
+     * The tracks that most often get listened to the end, over the plays of them that ended.
+     * Only plays with an end row are counted, so a track that is still playing does not count against it.
+     * Tracks with fewer than [minPlays] ended plays are left out, as one finished play says little.
+     */
+    @Query("""
+        SELECT p.track_id AS track_id,
+               COUNT(e.id) AS end_count,
+               COALESCE(SUM(CASE WHEN e.fully_played = 1 THEN 1 ELSE 0 END), 0) AS fully_played_count
+        FROM play_end e
+        JOIN play_start p ON p.id = e.play_start_id
+        GROUP BY p.track_id
+        HAVING end_count >= :minPlays
+        ORDER BY fully_played_count * 1.0 / end_count DESC, end_count DESC
+        LIMIT :limit
+    """)
+    fun getTracksListenedToEnd(minPlays: Int, limit: Int): List<TrackCompletionStats>
+
     @Query("""
         SELECT
             p.track_id AS track_id,

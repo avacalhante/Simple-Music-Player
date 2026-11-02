@@ -67,6 +67,18 @@ data class TrackPartialStopStats(
     @ColumnInfo(name = "avg_position_ratio") val avgPositionRatio: Double
 )
 
+/**
+ * How reliably a track gets listened to the end, over the plays of it that ended.
+ * A play still in progress has no end row and is not counted, so pausing does not lower the rate.
+ */
+data class TrackCompletionStats(
+    @ColumnInfo(name = "track_id") val trackId: Long,
+    @ColumnInfo(name = "end_count") val endCount: Int,
+    @ColumnInfo(name = "fully_played_count") val fullyPlayedCount: Int
+) {
+    val completionRate: Double get() = if (endCount == 0) 0.0 else fullyPlayedCount.toDouble() / endCount
+}
+
 data class TrackListeningTime(
     @ColumnInfo(name = "track_id") val trackId: Long,
     @ColumnInfo(name = "played_seconds") val playedSeconds: Long,

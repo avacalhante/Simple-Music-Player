@@ -13,6 +13,7 @@ import com.simplemobiletools.musicplayer.analytics.daos.SessionInfo
 import com.simplemobiletools.musicplayer.analytics.daos.TrackPartialStopStats
 import com.simplemobiletools.musicplayer.analytics.daos.PlaylistPlayStats
 import com.simplemobiletools.musicplayer.analytics.daos.PlaylistListeningTime
+import com.simplemobiletools.musicplayer.analytics.daos.TrackCompletionStats
 import com.simplemobiletools.musicplayer.analytics.daos.TrackListeningTime
 import com.simplemobiletools.musicplayer.analytics.daos.WeekdaySessionWindow
 import com.simplemobiletools.musicplayer.analytics.entities.ListeningSession
@@ -161,6 +162,17 @@ class ListeningAnalyticsStore(private val context: Context) {
 
     fun getTracksStoppedPartway(minPlays: Int = 3, limit: Int = 50): List<TrackPartialStopStats> =
         playEndDao.getTracksStoppedPartway(minPlays, limit)
+
+    /**
+     * Tracks that usually get listened to the end, best first. Only tracks listened to the end at least
+     * [minCompletionRate] of the time are returned, so the list stays honest when little has been played yet.
+     */
+    fun getTracksUsuallyListenedToEnd(
+        minPlays: Int = 3,
+        limit: Int = 10,
+        minCompletionRate: Double = 0.5
+    ): List<TrackCompletionStats> =
+        playEndDao.getTracksListenedToEnd(minPlays, limit).filter { it.completionRate >= minCompletionRate }
 
     // ---- most played ----
 

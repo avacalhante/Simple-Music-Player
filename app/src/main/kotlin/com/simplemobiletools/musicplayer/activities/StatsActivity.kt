@@ -44,6 +44,8 @@ private const val DAYS_LIMIT = 14
 private const val RESOLVE_CHUNK_SIZE = 400
 private const val RECENT_SESSIONS_LIMIT = 5
 private const val WEEKLY_TOP_LIMIT = 5
+private const val RARELY_SKIPPED_LIMIT = 10
+private const val RARELY_SKIPPED_MIN_PLAYS = 3
 private const val MINUTES_PER_DAY = 24 * 60
 private const val EXPORT_STATS_INTENT = 1
 private const val IMPORT_STATS_INTENT = 2
@@ -80,7 +82,8 @@ class StatsActivity : SimpleActivity() {
 
         arrayOf(
             binding.statsSummaryList, binding.statsMostPlayedList, binding.statsArtistsList, binding.statsAlbumsList,
-            binding.statsGenresList, binding.statsWeekdayHoursList, binding.statsWeekdaysList, binding.statsForgottenList, binding.statsDailyList,
+            binding.statsGenresList, binding.statsCompletionList, binding.statsWeekdayHoursList, binding.statsWeekdaysList, binding.statsForgottenList,
+            binding.statsDailyList,
             binding.statsSessionsList, binding.statsRecentSessionsList, binding.statsWeeklyList, binding.statsMonthList
         ).forEach {
             it.layoutManager = LinearLayoutManager(this)
@@ -209,7 +212,8 @@ class StatsActivity : SimpleActivity() {
         setupToolbar(binding.statsToolbar, NavigationIcon.Arrow)
         arrayOf(
             binding.statsSummaryLabel, binding.statsMostPlayedLabel, binding.statsArtistsLabel, binding.statsAlbumsLabel,
-            binding.statsGenresLabel, binding.statsWeekdayHoursLabel, binding.statsWeekdaysLabel, binding.statsForgottenLabel, binding.statsDailyLabel,
+            binding.statsGenresLabel, binding.statsCompletionLabel, binding.statsWeekdayHoursLabel, binding.statsWeekdaysLabel, binding.statsForgottenLabel,
+            binding.statsDailyLabel,
             binding.statsSessionsLabel, binding.statsRecentSessionsLabel, binding.statsWeeklyLabel, binding.statsMonthLabel
         ).forEach {
             it.setTextColor(getProperPrimaryColor())
@@ -233,6 +237,16 @@ class StatsActivity : SimpleActivity() {
             val forgottenRows = stalePlays.mapNotNull { stale ->
                 staleTracks[stale.trackId]?.let { StatsTrackRow(it, lastPlayedFormat.format(stale.lastPlayedAt * 1000L)) }
             }
+
+            val completionStats = analytics.getTracksUsuallyListenedToEnd(RARELY_SKIPPED_MIN_PLAYS, AGGREGATE_LIMIT)
+            val completionTracks = resolveTracks(completionStats.map { it.trackId })
+            val completionRows = completionStats.mapNotNull { stats ->
+                completionTracks[stats.trackId]?.let { track ->
+                    // truncated like the summary rate, so only a track that was never skipped reaches 100%
+                    val percent = stats.fullyPlayedCount * 100 / stats.endCount
+                    StatsTrackRow(track, getString(R.string.completion_with_plays, percent, playCountText(stats.endCount)))
+                }
+            }.take(RARELY_SKIPPED_LIMIT)
 
             val summaryRows = buildSummary(analytics)
             val artistRows = groupBy(playedRows) { it.track.artist }
@@ -269,6 +283,7 @@ class StatsActivity : SimpleActivity() {
                 binding.statsArtistsList.adapter = StatsRowAdapter(artistRows)
                 binding.statsAlbumsList.adapter = StatsRowAdapter(albumRows)
                 binding.statsGenresList.adapter = StatsRowAdapter(genreRows)
+                binding.statsCompletionList.adapter = StatsTrackAdapter(completionRows)
                 binding.statsWeekdayHoursList.adapter = StatsValueAdapter(weekdayHourRows)
                 binding.statsWeekdaysList.adapter = StatsRowAdapter(weekdayRows)
                 binding.statsForgottenList.adapter = StatsTrackAdapter(forgottenRows)
@@ -284,6 +299,8 @@ class StatsActivity : SimpleActivity() {
                 binding.statsArtistsSection.beVisibleIf(artistRows.isNotEmpty())
                 binding.statsAlbumsSection.beVisibleIf(albumRows.isNotEmpty())
                 binding.statsGenresSection.beVisibleIf(genreRows.isNotEmpty())
+                binding.statsCompletionSection.beVisibleIf(completionRows.isNotEmpty() || playedRows.isNotEmpty())
+                binding.statsCompletionEmpty.beVisibleIf(completionRows.isEmpty())
                 binding.statsWeekdayHoursSection.beVisibleIf(weekdayHourRows.isNotEmpty())
                 binding.statsWeekdaysSection.beVisibleIf(weekdayRows.isNotEmpty())
                 binding.statsForgottenSection.beVisibleIf(playedRows.isNotEmpty())

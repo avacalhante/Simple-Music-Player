@@ -71,6 +71,9 @@ play_end  [table]
   artist/album/genre rows shown      5        [StatsActivity]
   days shown                          14        [StatsActivity]
   library ids resolved per chunk    400        [StatsActivity]
+  "rarely skipped" min ended plays    3         [StatsActivity]
+  "rarely skipped" min completion    50%        [ListeningAnalytics]
+  "rarely skipped" rows shown        10         [StatsActivity]
 
 
 3. THE SCREEN (StatsActivity, main menu -> "Listening stats")
@@ -146,6 +149,38 @@ MOST PLAYED TRACKS / ARTISTS / ALBUMS / GENRES
   Aggregation happens in memory rather than in SQL because the playback
   side records no artist/album/genre keys; joining them to the library is
   a read of rows we already resolved.
+
+SONGS YOU RARELY SKIP
+
+  The share of a track's ended plays that reached the end of it, per track:
+
+    SELECT p.track_id,
+           COUNT(e.id) AS end_count,
+           SUM(e.fully_played) AS fully_played_count
+    FROM play_end e JOIN play_start p ON p.id = e.play_start_id
+    GROUP BY p.track_id
+    HAVING end_count >= 3
+    ORDER BY fully_played_count * 1.0 / end_count DESC, end_count DESC
+    LIMIT 500
+  [PlayEndDao.getTracksListenedToEnd]
+
+  Only ended plays are counted: a play that is still running, or one the app
+  was killed during, has no play_end row and cannot drag the rate down. A
+  paused and resumed track is one attempt, so pausing does not count as
+  stopping partway. "Fully played" is the same test the summary uses
+  (position >= duration - 3 seconds), so this section and "Finished tracks"
+  cannot disagree.
+
+  The rate is shown truncated to whole percent, like the summary rate, so
+  only a track that was never skipped reads 100%. Rows carry the count of
+  ended plays next to the percent ("71% · 7 plays") so a track with 3 plays
+  is not confused with one that has 300.
+
+  Tracks with fewer than 3 ended plays are left out (one finished play says
+  nothing), and so are tracks below 50% completion, so the list stays a list
+  of songs that are actually rarely skipped rather than a ranking of them.
+  The best 10 that survive are shown. Ids are resolved against the library
+  like the other track lists, so a play of a deleted track is dropped.
 
 AVERAGE LISTENING HOURS BY WEEKDAY
 

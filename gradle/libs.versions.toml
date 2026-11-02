@@ -34,8 +34,8 @@ app-build-kotlinJVMTarget = "17"
 shortcut-badger = "1.1.22"
 #versioning
 app-version-appId = "com.simplemobiletools.musicplayer"
-app-version-versionCode = "122"
-app-version-versionName = "5.18.6"
+app-version-versionCode = "123"
+app-version-versionName = "5.18.7"
 [libraries]
 #AndroidX
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "androidx-constraintlayout" }

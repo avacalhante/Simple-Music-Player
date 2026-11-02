@@ -102,6 +102,8 @@
     <string name="most_played_artists">Most played artists</string>
     <string name="most_played_albums">Most played albums</string>
     <string name="most_played_genres">Most played genres</string>
+    <string name="songs_rarely_skipped">Songs you rarely skip</string>
+    <string name="no_completion_data">Play a song at least 3 times to see how often you listen it to the end.</string>
     <string name="listening_by_day_of_week">Plays by day of week</string>
     <string name="average_listening_hours">Average listening hours by weekday</string>
     <string name="time_range">%1$s – %2$s</string>
@@ -109,6 +111,7 @@
     <string name="everything_played_recently">Every track you have played was played recently.</string>
     <string name="listening_time_by_day">Listening time by day</string>
     <string name="never_played_summary">%1$d of %2$d</string>
+    <string name="completion_with_plays">%1$d%% · %2$s</string>
     <string name="no_listening_data">Nothing tracked yet. Play a few songs and come back.</string>
     <string name="listening_sessions">Listening sessions</string>
     <string name="session_count">Sessions</string>

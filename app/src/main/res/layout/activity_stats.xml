@@ -240,6 +240,41 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/stats_completion_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/stats_completion_label"
+                    style="@style/SettingsSectionLabelStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/songs_rarely_skipped" />
+
+                <com.simplemobiletools.commons.views.MyTextView
+                    android:id="@+id/stats_completion_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:paddingStart="@dimen/normal_margin"
+                    android:paddingTop="@dimen/normal_margin"
+                    android:paddingEnd="@dimen/normal_margin"
+                    android:paddingBottom="@dimen/normal_margin"
+                    android:text="@string/no_completion_data"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stats_completion_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false" />
+
+                <include layout="@layout/divider" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/stats_weekday_hours_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
