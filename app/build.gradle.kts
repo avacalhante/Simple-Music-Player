@@ -112,6 +112,8 @@ kotlin {
 }
 
 dependencies {
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
     implementation(libs.simple.mobile.tools.commons)
     implementation(libs.eventbus)
     implementation(libs.androidx.swiperefreshlayout)
